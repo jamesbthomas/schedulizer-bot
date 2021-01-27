@@ -3,8 +3,11 @@ import discord
 # Required to read the token from the environment file
 import os
 
+# Build the Intents object for the client
+intents = discord.Intents.default()
+intents.members = True
 # Create an instance of the discord client
-client = discord.Client()
+client = discord.Client(intents=intents)
 
 # Asynchronous function calls inherited from the client class (i think)
 # when the client class runs (using the token to authenticate) it sends events back to the bot like on_ready and on_message
@@ -15,17 +18,25 @@ client = discord.Client()
 @client.event
 async def on_ready():
   print('Logged on as: {0.user}'.format(client))
+  print('Connected to ' + str(len(client.guilds)) + " servers")
+  for guild in client.guilds:
+    print("\tName: ",guild.name,";\tID: ",guild.id,";\tOwner: ",guild.owner)
 
 # Actions to take after the client reports a new message
 # TODO replace all these ifs with a a case statement... much better
 @client.event
 async def on_message(message):
-  # Auto break 
+  # Auto break if the message is from this bot
   if message.author == client.user:
     return
-  elif message.content.startswith('$'):
-    if message.content.startswith('$hello'):
+  # Check if message starts with this bot's imperative operator
+  elif message.content.startswith('!'):
+    # Split the message into arguments a la shells
+    args = message.content.split('!')[1].split()
+    # Case switch (but python so not a case switch) on the command
+    if args[0] == "hello":
       await message.channel.send('Hello!')
+  # Break if message does not have any imperatives
   else:
     return
 
