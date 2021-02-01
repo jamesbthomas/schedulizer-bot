@@ -12,14 +12,14 @@ class Server(object):
   
 
 class SchedClient(discord.Client):
-    #Extending the Discord.Client class so that I can track connected servers independently
 
     servers = []
     server_ids = []
 
-    def __init__(self):
-        self = discord.Client()
+    def setup(self):
+        # Initialize attributes
         self.servers = []
+        self.server_ids = []
 
     def addServer(self,id,name,owner):
         if id in self.server_ids:

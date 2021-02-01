@@ -2,12 +2,21 @@
 import discord
 # Required to read the token from the environment file
 import os
+# Required to add classes subpackage to the path
+import sys
+# Add project_root to the path so we can import from subpackages
+project_root = os.path.dirname(__file__)
+sys.path.append(os.path.join(project_root,"classes"))
+
+# Import subpackages
+import server
 
 # Build the Intents object for the client
 intents = discord.Intents.default()
 intents.members = True
-# Create an instance of the discord client
-client = discord.Client(intents=intents)
+# Create an instance of the schedClient
+client = server.SchedClient(intents=intents)
+client.setup()
 
 # Asynchronous function calls inherited from the client class (i think)
 # when the client class runs (using the token to authenticate) it sends events back to the bot like on_ready and on_message
@@ -22,9 +31,9 @@ async def on_ready():
   for guild in client.guilds:
     print("\tName: ",guild.name,";\tID: ",guild.id,";\tOwner: ",guild.owner)
     # Check to see if we know this server
-    if guild.id not in client.servers:
-      
-    else:
+#    if guild.id not in client.server_ids:
+#      
+#    else:
     
     
 # Actions to take after the client reports a new message
@@ -51,7 +60,7 @@ async def on_message(message):
         await message.channel.send("Placeholder for \'new player\' command")
       # Unknown option, print usage
       else:
-        await message.channe.send("Usage: new [player]")
+        await message.channel.send("Usage: new [player]")
     # Control sequence for the sched command used to control attendance
     elif args[0] == "sched":
       if len(args) < 2:
@@ -77,4 +86,5 @@ async def on_message(message):
     return
 
 # Call the client run method of the previously created discord client, using the value of the TOKEN key in the current directory's environment file, .env
-client.run(os.getenv('TOKEN'))
+TOKEN = os.getenv('TOKEN')
+client.run(TOKEN)
