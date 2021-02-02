@@ -4,11 +4,6 @@ import discord
 
 class Server(object):
     # Class for tracking properties by server
-    ## For tracking the discord.Role objects on this server that correspond to our schedules
-    Raider = None
-    Social = None
-    Member = None
-    PUG = None
 
     def mapRole(self,role,sched):
       if sched == "Raider":
@@ -22,11 +17,29 @@ class Server(object):
       else:
         raise AttributeError("Unknown Schedule option")
       return
+
+    def updateRoster(self,player):
+      try:
+        i = self.roster_names.index(player.name)
+        self.roster.pop(i)
+        self.roster.insert(i,player)
+      except ValueError:
+        self.roster.append(player)
+        self.roster_names.append(player.name)
+      return
     
     def __init__(self,id,name,owner):
         self.id = id
         self.name = name
         self.owner = owner
+        # List of player objects in this server
+        self.roster = []
+        self.roster_names = []
+        ## For tracking the discord.Role objects on this server that correspond to our schedules
+        self.Raider = None
+        self.Social = None
+        self.Member = None
+        self.PUG = None
 
 class SchedClient(discord.Client):
 

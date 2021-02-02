@@ -49,6 +49,18 @@ async def on_ready():
         continue
     try:
       print("\tRoles: RAIDER/"+server.Raider.name,"SOCIAL/"+server.Social.name,"MEMBER/"+server.Member.name,"PUG/"+server.PUG.name)
+      # Create user objects for each player with a valid schedule role
+      for member in guild.members:
+        if server.Raider in member.roles:
+          print(member.name,"->Raider")
+        elif server.Social in member.roles:
+          print(member.name,"->Social")
+        elif server.Member in member.roles:
+          print(member.name,"->Member")
+        elif server.PUG in member.roles:
+          print(member.name,"->PUG")
+        else:
+          continue
     except:
       print("\tNo mapped roles")
   # TODO - spin off new thread to handle command line args from the bot side
@@ -104,4 +116,4 @@ async def on_message(message):
 
 # Call the client run method of the previously created discord client, using the value of the TOKEN key in the current directory's environment file, .env
 TOKEN = os.getenv('TOKEN')
-client.run(TOKEN)
+client.run("ODAzNjc0MTI2NjkwMTU2NTU1.YBBN2w.yo53FwhPmi6Z2JKCg9utnTnS3H4")
