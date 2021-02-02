@@ -14,7 +14,7 @@ def test_addServer():
     """
     GIVEN server.addServer method with valid inputs
     WHEN the method is called
-    THEN a new Server object should be created and added to the Client object's list of servers
+    THEN a new Server object should be created and added to the Client object's list of servers; the Server objects track more detailed information than the Guild objects provided by discord
     """
     
     client = server.SchedClient()
@@ -44,3 +44,45 @@ def test_addServer():
 
     with pytest.raises(FileExistsError,match="Server already known"):
         client.addServer(id = "test1",name = "third test",owner = "Owner")
+
+def test_mapRoles():
+  """
+  GIVEN server.mapRoles method with template inputs (constructing a discord.Role object manually is annoying and I don't have a good reason to extend it)
+  WHEN the method is called
+  THEN the Server attributes for each schedulizer role should be mapped to the role for that server
+  """
+
+  client = server.SchedClient()
+
+  # Add Test Server
+  client.addServer(
+    id = "rolesTest",
+    name = "Server for mapRoles test",
+    owner = "TestOwner"
+  )
+
+  # Create test Role based on discord.Role but only with features that I might care about checking later
+  class Role(object):
+    def __init__(self,name,guild,mention):
+      self.name = name
+      self.guild = guild
+      self.mention = mention
+
+  testRaider = Role("testRaider",client.servers[0].name,"@testRaider")
+  testSocial = Role("testSocial",client.servers[0].name,"@testSocial")
+  testMember = Role("testMember",client.servers[0].name,"@testMember")
+  testPUG = Role("testPUG",client.servers[0].name,"@testPUG")
+
+  client.servers[0].mapRole(testRaider,"Raider")
+  client.servers[0].mapRole(testSocial,"Social")
+  client.servers[0].mapRole(testMember,"Member")
+  client.servers[0].mapRole(testPUG,"PUG")
+
+  # Tests
+  assert client.servers[0].Raider == testRaider
+  assert client.servers[0].Social == testSocial
+  assert client.servers[0].Member == testMember
+  assert client.servers[0].PUG == testPUG
+  with pytest.raises(AttributeError,match="Unknown Schedule option"):
+    client.servers[0].mapRole(testRaider,"bad")
+  # Test exception handling

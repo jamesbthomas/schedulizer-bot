@@ -29,12 +29,29 @@ async def on_ready():
   print('Logged on as: {0.user}'.format(client))
   print('Connected to ' + str(len(client.guilds)) + " servers")
   for guild in client.guilds:
-    print("\tName: ",guild.name,";\tID: ",guild.id,";\tOwner: ",guild.owner)
-    # Check to see if we know this server
-#    if guild.id not in client.server_ids:
-#      
-#    else:
-    
+    print("Name: ",guild.name,";\tID: ",guild.id,";\tOwner: ",guild.owner)
+    server = client.addServer(guild.id,guild.name,guild.owner)
+    # Identify Role objects for schedulizer-based roles
+    for role in guild.roles:
+      if role.name == "Raider":
+        # Map Role object to the Raider schedule
+        server.mapRole(role,"Raider")
+      elif role.name == "Social":
+        # Map Role object to the Social schedule
+        server.mapRole(role,"Social")
+      elif role.name == "Member":
+        # Map Role object to the Member schedule
+        server.mapRole(role,"Member")
+      elif role.name == "Pug":
+        # Map Role object to the PUG schedule
+        server.mapRole(role,"PUG")
+      else:
+        continue
+    try:
+      print("\tRoles: RAIDER/"+server.Raider.name,"SOCIAL/"+server.Social.name,"MEMBER/"+server.Member.name,"PUG/"+server.PUG.name)
+    except:
+      print("\tNo mapped roles")
+  # TODO - spin off new thread to handle command line args from the bot side
     
 # Actions to take after the client reports a new message
 @client.event
