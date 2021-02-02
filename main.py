@@ -116,4 +116,4 @@ async def on_message(message):
 
 # Call the client run method of the previously created discord client, using the value of the TOKEN key in the current directory's environment file, .env
 TOKEN = os.getenv('TOKEN')
-client.run("ODAzNjc0MTI2NjkwMTU2NTU1.YBBN2w.yo53FwhPmi6Z2JKCg9utnTnS3H4")
+client.run(TOKEN)
