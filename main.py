@@ -9,7 +9,7 @@ project_root = os.path.dirname(__file__)
 sys.path.append(os.path.join(project_root,"classes"))
 
 # Import subpackages
-import server
+import server, player
 
 # Build the Intents object for the client
 intents = discord.Intents.default()
@@ -52,16 +52,18 @@ async def on_ready():
       # Create user objects for each player with a valid schedule role
       for member in guild.members:
         if server.Raider in member.roles:
-          print(member.name,"->Raider")
+          sched = "Raider"
         elif server.Social in member.roles:
-          print(member.name,"->Social")
+          sched = "Social"
         elif server.Member in member.roles:
-          print(member.name,"->Member")
+          sched = "Member"
         elif server.PUG in member.roles:
-          print(member.name,"->PUG")
+          sched = "PUG"
         else:
           continue
-    except:
+        p = player.Player(member.name,sched=sched)
+        server.updateRoster(p)
+    except AttributeError:
       print("\tNo mapped roles")
   # TODO - spin off new thread to handle command line args from the bot side
     

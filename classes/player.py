@@ -10,6 +10,12 @@ class Player(object):
     if sched == None and roles == None:
       raise TypeError("No options provided")
 
+  def __str__(self):
+    try:
+      return "Name: "+self.name+"; Sched: "+self.sched+"; Roles: "+",".join(self.roles)
+    except:
+      return "Name: "+self.name+"; Sched: "+self.sched+"; Roles: N/A"
+
   def __init__(self,name,sched=None,roles=None):
     self.name = name
     self.sched = sched
