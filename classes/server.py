@@ -1,6 +1,7 @@
 # Defines the Server class and extends the Discord.Client class to track it
 
 import discord
+from discord.ext import commands
 
 class Server(object):
     # Class for tracking properties by server
@@ -41,7 +42,7 @@ class Server(object):
         self.Member = None
         self.PUG = None
 
-class SchedClient(discord.Client):
+class SchedClient(commands.Bot):
 
     servers = []
     server_ids = []

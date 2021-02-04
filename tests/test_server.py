@@ -18,7 +18,7 @@ def test_addServer():
     THEN a new Server object should be created and added to the Client object's list of servers; the Server objects track more detailed information than the Guild objects provided by discord
     """
     
-    client = server.SchedClient()
+    client = server.SchedClient(command_prefix='!')
     
     # Add first server
     client.addServer(
@@ -54,7 +54,7 @@ def test_mapRoles():
   """
 
   client = None
-  client = server.SchedClient()
+  client = server.SchedClient(command_prefix='!')
 
   # Add Test Server
   client.addServer(
@@ -97,7 +97,7 @@ def test_updateRoster():
   """
 
   client = None
-  client = server.SchedClient()
+  client = server.SchedClient(command_prefix='!')
 
   # Add Test Server
   s = client.addServer(

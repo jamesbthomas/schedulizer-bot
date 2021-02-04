@@ -15,7 +15,7 @@ import server, player
 intents = discord.Intents.default()
 intents.members = True
 # Create an instance of the schedClient
-client = server.SchedClient(intents=intents)
+client = server.SchedClient(intents=intents,command_prefix='!')
 client.setup()
 
 # Asynchronous function calls inherited from the client class (i think)
@@ -66,7 +66,7 @@ async def on_ready():
     except AttributeError:
       print("\tNo mapped roles")
   # TODO - spin off new thread to handle command line args from the bot side
-    
+""" Keeping here for legacy
 # Actions to take after the client reports a new message
 @client.event
 async def on_message(message):
@@ -115,7 +115,12 @@ async def on_message(message):
   # Break if message does not have any imperatives
   else:
     return
+"""
+
+@client.command(name="hello")
+async def helloWorld(context):
+  await context.send("Hello World!")
 
 # Call the client run method of the previously created discord client, using the value of the TOKEN key in the current directory's environment file, .env
 TOKEN = os.getenv('TOKEN')
-client.run(TOKEN)
+client.run("ODAzNjc0MTI2NjkwMTU2NTU1.YBBN2w.01HwtGG8XvGcSYtiAEVGbczeGY8")
