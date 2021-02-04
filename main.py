@@ -53,6 +53,26 @@ async def on_ready():
 async def helloWorld(context):
   await context.send("Hello World!")
 
+@client.command(name="show",help="Displays different information. Usage: !show [roster|events]")
+async def show(context,opt: str):
+  if opt == "roster":
+    await context.send("!show roster stub")
+    # TODO
+  elif opt == "events":
+    await context.send("!show events stub")
+    # TODO
+  else:
+    await context.send_help(context.command)
+
+@client.event
+async def on_command_error(context,error):
+  if isinstance(error,discord.ext.commands.errors.CheckFailure):
+    await context.send('You do not have the correct role for this command.')
+  elif isinstance(error,discord.ext.commands.errors.MissingRequiredArgument):
+    await context.send_help(context.command)
+  else:
+    await context.send_help()
+
 # Call the client run method of the previously created discord client, using the value of the TOKEN key in the current directory's environment file, .env
 TOKEN = os.getenv('TOKEN')
 client.run(TOKEN)
