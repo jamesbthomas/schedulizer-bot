@@ -34,9 +34,10 @@ class Server(object):
         self.name = name
         self.owner = owner
         # List of player objects in this server
+        ## TODO - turn this into a dictionary, key is the name value is the object
         self.roster = []
         self.roster_names = []
-        ## For tracking the discord.Role objects on this server that correspond to our schedules
+        # For tracking the discord.Role objects on this server that correspond to our schedules
         self.Raider = None
         self.Social = None
         self.Member = None
@@ -44,6 +45,7 @@ class Server(object):
 
 class SchedClient(commands.Bot):
 
+    ## TODO - turn this into a dictionary, key is the server_id value is the object
     servers = []
     server_ids = []
 
@@ -52,6 +54,7 @@ class SchedClient(commands.Bot):
         self.servers = []
         self.server_ids = []
         # Read in from database
+        ## TODO - setup database for tracking
 
     def addServer(self,id,name,owner):
         if id in self.server_ids:

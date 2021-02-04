@@ -55,11 +55,18 @@ async def helloWorld(context):
 
 @client.command(name="show",help="Displays different information. Usage: !show [roster|events]")
 async def show(context,opt: str):
+  server = client.servers[client.server_ids.index(context.guild.id)]
   if opt == "roster":
-    await context.send("!show roster stub")
+    roster = []
+    for p in server.roster:
+      if p.sched != "Pug":
+        roster.append(str(p))
+      else:
+        continue
+    await context.send("\n".join(roster))
     # TODO
   elif opt == "events":
-    await context.send("!show events stub")
+    await context.send("STUB: !show events")
     # TODO
   else:
     await context.send_help(context.command)
