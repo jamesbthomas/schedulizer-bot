@@ -82,4 +82,4 @@ async def on_command_error(context,error):
 
 # Call the client run method of the previously created discord client, using the value of the TOKEN key in the current directory's environment file, .env
 TOKEN = os.getenv('TOKEN')
-client.run(TOKEN)
+client.run("ODAzNjc0MTI2NjkwMTU2NTU1.YBBN2w.SnHlDdbIBFjDvV8f69izeDQy-xc")
