@@ -132,4 +132,4 @@ dmypy.json
 .replit
 
 # DB files
-.db
+*.db
