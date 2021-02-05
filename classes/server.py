@@ -1,6 +1,6 @@
 # Defines the Server class and extends the Discord.Client class to track it
 
-import discord
+import discord, pickledb, os
 from discord.ext import commands
 
 class Server(object):
@@ -42,6 +42,19 @@ class Server(object):
         self.Social = None
         self.Member = None
         self.PUG = None
+        # Create the database file for this server
+        project_root = os.path.split(os.path.dirname(__file__))[0]
+        try:
+          os.makedirs(os.path.join(project_root,"databases",str(id)+".db"))
+        except FileExistsError:
+          None
+        self.db_path = os.path.join(project_root,"databases",str(id)+".db")
+        self.db = pickledb.load(os.path.join(self.db_path,"server.db"), False)
+        self.db.set('id',id)
+        self.db.set('name',name)
+        self.db.set('owner',str(owner))
+        self.db.dump()
+
 
 class SchedClient(commands.Bot):
 
@@ -53,8 +66,15 @@ class SchedClient(commands.Bot):
         # Initialize attributes
         self.servers = []
         self.server_ids = []
-        # Read in from database
-        ## TODO - setup database for tracking
+        # Read in pickledb databases from database
+        project_root = os.path.split(os.path.dirname(__file__))[0]
+        ## TODO do some startup logging here for if this is a brand new install or if there are db files to read in and load
+        for f in os.listdir(path=os.path.join(project_root,"databases")):
+          db = pickledb.load(os.path.join(project_root,"databases",f,"server.db"),False)
+          id = db.get('id')
+          server = Server(id,db.get('name'),db.get('owner'))
+          self.servers.append(server)
+          self.servers.append(id)
 
     def addServer(self,id,name,owner):
         if id in self.server_ids:

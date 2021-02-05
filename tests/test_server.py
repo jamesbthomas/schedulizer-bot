@@ -46,6 +46,12 @@ def test_addServer():
     with pytest.raises(FileExistsError,match="Server already known"):
         client.addServer(id = "test1",name = "third test",owner = "Owner")
 
+    # Check for database creation
+    assert client.servers[0].db_path == os.path.join(project_root,"databases","test1.db")
+    assert client.servers[0].db != None
+    assert client.servers[1].db_path == os.path.join(project_root,"databases","test2.db")
+    assert client.servers[1].db != None
+
 def test_mapRoles():
   """
   GIVEN server.mapRoles method with template inputs (constructing a discord.Role object manually is annoying and I don't have a good reason to extend it)
