@@ -1,8 +1,6 @@
 # Test-Driven Development for the Server class
 
-import pytest
-import sys
-import os
+import pytest, sys, os, pickledb
 project_root = os.path.split(os.path.dirname(__file__))[0]
 print(project_root)
 sys.path.append(os.path.join(project_root,"classes"))
@@ -10,6 +8,43 @@ sys.path.append(os.path.join(project_root,"classes"))
 # Import modules for testing
 import server
 import player
+
+def test_SchedClient():
+  """
+  GIVEN the SchedClient subclass of discord.ext.commands.Bot
+  WHEN a new Schedulizer Client is initialized
+  THEN a correctly formatted SchedClient object is created for all active DB files, ready to connect to the Discord server
+  """
+  # Get active DBs
+  dbs = os.listdir(path=os.path.join(project_root,"databases"))
+
+  # Initiate test
+  client = server.SchedClient(command_prefix='!')
+
+  # Test necessary inherited options
+  assert client.command_prefix == '!'
+  # Test tracking variable instantiation
+  assert client.servers == []
+  assert client.server_ids == []
+
+  # Run function
+  client.setup()
+
+  # grab new DBs and make sure they havent changed
+  assert os.listdir(path=os.path.join(project_root,"databases")) == dbs
+
+  # Test DB functions
+  ## make sure it read all available databases
+  for f in dbs:
+    id = int(f.split(".")[0])
+    s = client.servers[client.server_ids.index(id)]
+    assert id in client.server_ids
+    ## Validate that databases had correct info
+    db = pickledb.load(os.path.join(project_root,"databases",f,"server.db"),False)
+    assert db.get('owner') == s.owner
+    assert db.get('id') == s.id
+    assert db.get('name') == s.name
+  
 
 def test_addServer():
     """
@@ -51,6 +86,12 @@ def test_addServer():
     assert client.servers[0].db != None
     assert client.servers[1].db_path == os.path.join(project_root,"databases","test2.db")
     assert client.servers[1].db != None
+
+    # clear out DBs from this test
+    os.remove(os.path.join(project_root,"databases","test2.db",'server.db'))
+    os.remove(os.path.join(project_root,"databases","test1.db",'server.db'))
+    os.rmdir(os.path.join(project_root,"databases","test1.db"))
+    os.rmdir(os.path.join(project_root,"databases","test2.db"))
 
 def test_mapRoles():
   """
@@ -94,6 +135,10 @@ def test_mapRoles():
   with pytest.raises(AttributeError,match="Unknown Schedule option"):
     client.servers[0].mapRole(testRaider,"bad")
   # Test exception handling
+
+  # clear out DBs
+  os.remove(os.path.join(project_root,"databases","rolesTest.db","server.db"))
+  os.rmdir(os.path.join(project_root,"databases","rolesTest.db"))
 
 def test_updateRoster():
   """
@@ -182,3 +227,9 @@ def test_updateRoster():
   s.updateRoster(rolesRoles)
   assert s.roster[2] == rolesRoles
   assert s.roster == rolesRoster
+
+  ## TODO - test writing to DB
+
+  # clear out DBs
+  os.remove(os.path.join(project_root,"databases","rosterTest.db","server.db"))
+  os.rmdir(os.path.join(project_root,"databases","rosterTest.db"))

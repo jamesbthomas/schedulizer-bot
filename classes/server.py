@@ -74,7 +74,7 @@ class SchedClient(commands.Bot):
           id = db.get('id')
           server = Server(id,db.get('name'),db.get('owner'))
           self.servers.append(server)
-          self.servers.append(id)
+          self.server_ids.append(id)
 
     def addServer(self,id,name,owner):
         if id in self.server_ids:
