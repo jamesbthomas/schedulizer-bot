@@ -4,6 +4,8 @@ import discord
 import os
 # Required to add classes subpackage to the path
 import sys
+# Required for reading the auth token from the environment file (not included in git repo)
+from dotenv import load_dotenv
 # Add project_root to the path so we can import from subpackages
 project_root = os.path.dirname(__file__)
 sys.path.append(os.path.join(project_root,"classes"))
@@ -29,15 +31,14 @@ async def on_ready():
   print('Logged on as: {0.user}'.format(client))
   print('Connected to ' + str(len(client.guilds)) + " servers")
   for guild in client.guilds:
-    print("Name: ",guild.name,";\tID: ",guild.id,";\tOwner: ",guild.owner)
-    server = client.addServer(guild.id,guild.name,guild.owner)
-    # Identify Role objects for schedulizer-based roles
-    server.mapRole(discord.utils.find(lambda r: r.name == "Raider",guild.roles),"Raider")
-    server.mapRole(discord.utils.find(lambda r: r.name == "Social",guild.roles),"Social")
-    server.mapRole(discord.utils.find(lambda r: r.name == "Member",guild.roles),"Member")
-    server.mapRole(discord.utils.find(lambda r: r.name == "Pug",guild.roles),"PUG")
-    try:
-      print("\tRoles: RAIDER/"+server.Raider.name,"SOCIAL/"+server.Social.name,"MEMBER/"+server.Member.name,"PUG/"+server.PUG.name)
+    if guild.id not in client.server_ids:
+      print("Name: ",guild.name,";\tID: ",guild.id,";\tOwner: ",guild.owner)
+      server = client.addServer(guild.id,guild.name,guild.owner)
+      # Identify Role objects for schedulizer-based roles
+      server.mapRole(discord.utils.find(lambda r: r.name == "Raider",guild.roles),"Raider")
+      server.mapRole(discord.utils.find(lambda r: r.name == "Social",guild.roles),"Social")
+      server.mapRole(discord.utils.find(lambda r: r.name == "Member",guild.roles),"Member")
+      server.mapRole(discord.utils.find(lambda r: r.name == "Pug",guild.roles),"PUG")
       # Create user objects for each player with a valid schedule role
       for member in guild.members:
         try:
@@ -45,8 +46,15 @@ async def on_ready():
           server.updateRoster(p)
         except AttributeError:
           continue
+    else:
+      print("Server known")
+      server = client.servers[client.server_ids.index(guild.id)]
+      server.getRoles(guild.roles)
+      server.getRoster()
+    try:
+      print("\tRoles: RAIDER/"+server.Raider.name,"SOCIAL/"+server.Social.name,"MEMBER/"+server.Member.name,"PUG/"+server.PUG.name)
     except AttributeError:
-      print("\tNo mapped roles")
+      print("No mapped roles")
   # TODO - spin off new thread to handle command line args from the bot side
 
 @client.command(name="hello",help="Prints 'Hello World!'")
@@ -81,5 +89,6 @@ async def on_command_error(context,error):
     await context.send_help()
 
 # Call the client run method of the previously created discord client, using the value of the TOKEN key in the current directory's environment file, .env
+load_dotenv()
 TOKEN = os.getenv('TOKEN')
 client.run(TOKEN)

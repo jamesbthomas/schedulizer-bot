@@ -36,14 +36,17 @@ def test_SchedClient():
   # Test DB functions
   ## make sure it read all available databases
   for f in dbs:
-    id = int(f.split(".")[0])
-    s = client.servers[client.server_ids.index(id)]
-    assert id in client.server_ids
-    ## Validate that databases had correct info
-    db = pickledb.load(os.path.join(project_root,"databases",f,"server.db"),False)
-    assert db.get('owner') == s.owner
-    assert db.get('id') == s.id
-    assert db.get('name') == s.name
+    try:
+      id = int(f.split(".")[0])
+      s = client.servers[client.server_ids.index(id)]
+      assert id in client.server_ids
+      ## Validate that databases had correct info
+      db = pickledb.load(os.path.join(project_root,"databases",f,"server.db"),False)
+      assert db.get('owner') == s.owner
+      assert db.get('id') == s.id
+      assert db.get('name') == s.name
+    except ValueError:
+      continue
   
 
 def test_addServer():
@@ -83,13 +86,19 @@ def test_addServer():
 
     # Check for database creation
     assert client.servers[0].db_path == os.path.join(project_root,"databases","test1.db")
-    assert client.servers[0].db != None
+    assert client.servers[0].db.get('owner') == "ServerOwner#1"
+    assert client.servers[0].db.get('id') == "test1"
+    assert client.servers[0].db.get('name') == "name for test"
     assert client.servers[1].db_path == os.path.join(project_root,"databases","test2.db")
-    assert client.servers[1].db != None
+    assert client.servers[1].db.get('owner') == "ServerOwner#2"
+    assert client.servers[1].db.get('id') == "test2"
+    assert client.servers[1].db.get('name') == "name for second"
 
     # clear out DBs from this test
     os.remove(os.path.join(project_root,"databases","test2.db",'server.db'))
     os.remove(os.path.join(project_root,"databases","test1.db",'server.db'))
+    os.remove(os.path.join(project_root,"databases","test2.db",'roster.db'))
+    os.remove(os.path.join(project_root,"databases","test1.db",'roster.db'))
     os.rmdir(os.path.join(project_root,"databases","test1.db"))
     os.rmdir(os.path.join(project_root,"databases","test2.db"))
 
@@ -109,35 +118,45 @@ def test_mapRoles():
     name = "Server for mapRoles test",
     owner = "TestOwner"
   )
+  client.setup()
 
   # Create test Role based on discord.Role but only with features that I might care about checking later
   class Role(object):
-    def __init__(self,name,guild,mention):
+    def __init__(self,name,guild,mention,id):
       self.name = name
       self.guild = guild
       self.mention = mention
+      self.id = id
 
-  testRaider = Role("testRaider",client.servers[0].name,"@testRaider")
-  testSocial = Role("testSocial",client.servers[0].name,"@testSocial")
-  testMember = Role("testMember",client.servers[0].name,"@testMember")
-  testPUG = Role("testPUG",client.servers[0].name,"@testPUG")
+  testRaider = Role("testRaider",client.servers[0].name,"@testRaider",1111)
+  testSocial = Role("testSocial",client.servers[0].name,"@testSocial",2222)
+  testMember = Role("testMember",client.servers[0].name,"@testMember",3333)
+  testPUG = Role("testPUG",client.servers[0].name,"@testPUG",4444)
 
   client.servers[0].mapRole(testRaider,"Raider")
   client.servers[0].mapRole(testSocial,"Social")
   client.servers[0].mapRole(testMember,"Member")
   client.servers[0].mapRole(testPUG,"PUG")
 
+  print(client.servers[0].Raider)
+
   # Tests
   assert client.servers[0].Raider == testRaider
   assert client.servers[0].Social == testSocial
   assert client.servers[0].Member == testMember
   assert client.servers[0].PUG == testPUG
+  # Exception handling
   with pytest.raises(AttributeError,match="Unknown Schedule option"):
     client.servers[0].mapRole(testRaider,"bad")
-  # Test exception handling
+  # Test DB writes
+  assert client.servers[0].db.get("Raider") == testRaider.id
+  assert client.servers[0].db.get("Social") == testSocial.id
+  assert client.servers[0].db.get("Member") == testMember.id
+  assert client.servers[0].db.get("PUG") == testPUG.id
 
   # clear out DBs
   os.remove(os.path.join(project_root,"databases","rolesTest.db","server.db"))
+  os.remove(os.path.join(project_root,"databases","rolesTest.db","roster.db"))
   os.rmdir(os.path.join(project_root,"databases","rolesTest.db"))
 
 def test_updateRoster():
@@ -163,16 +182,21 @@ def test_updateRoster():
   schedPlayer = player.Player("testPlayer#2222",sched="Raider")
   rolesPlayer = player.Player("testPlayer#3333",roles=["Healer","DPS"])
   roster = [fullPlayer,schedPlayer,rolesPlayer]
-
+  
   # Tests
   ## Add to empty roster
   s.updateRoster(fullPlayer)
   assert s.roster[0] == fullPlayer
+  assert s.roster_db.get(fullPlayer.name) == [fullPlayer.sched,fullPlayer.roles]
   s.updateRoster(schedPlayer)
   assert s.roster[1] == schedPlayer
+  assert s.roster_db.get(schedPlayer.name) == [schedPlayer.sched,schedPlayer.roles]
   s.updateRoster(rolesPlayer)
   assert s.roster[2] == rolesPlayer
+  assert s.roster_db.get(rolesPlayer.name) == [rolesPlayer.sched,rolesPlayer.roles]
   assert s.roster == roster
+  ## Capture the database at this stage so we can reset to it later
+  db = s.roster_db
   ## Change/Add schedules
   newFull = player.Player("testPlayer#1111",sched="Raider",roles=["Tank","DPS"])
   newSched = player.Player("testPlayer#2222",sched="Social")
@@ -180,13 +204,17 @@ def test_updateRoster():
   newRoster = [newFull,newSched,newRoles]
   s.updateRoster(newFull)
   assert s.roster[0] == newFull
+  assert s.roster_db.get(newFull.name) == [newFull.sched,newFull.roles]
   s.updateRoster(newSched)
   assert s.roster[1] == newSched
+  assert s.roster_db.get(newSched.name) == [newSched.sched,newSched.roles]
   s.updateRoster(newRoles)
   assert s.roster[2] == newRoles
+  assert s.roster_db.get(newRoles.name) == [newRoles.sched,newRoles.roles]
   assert s.roster == newRoster
   ### Reset for next battery
   s.roster = roster
+  s.roster_db = db
   ## Change/add Roles
   newerFull = player.Player("testPlayer#1111",sched="Raider",roles=["Tank"])
   newerSched = player.Player("testPlayer#2222",sched="Social",roles=["DPS"])
@@ -194,13 +222,17 @@ def test_updateRoster():
   newerRoster = [newerFull,newerSched,newerRoles]
   s.updateRoster(newerFull)
   assert s.roster[0] == newerFull
+  assert s.roster_db.get(newerFull.name) == [newerFull.sched,newerFull.roles]
   s.updateRoster(newerSched)
   assert s.roster[1] == newerSched
+  assert s.roster_db.get(newerSched.name) == [newerSched.sched,newerSched.roles]
   s.updateRoster(newerRoles)
   assert s.roster[2] == newerRoles
+  assert s.roster_db.get(newerRoles.name) == [newerRoles.sched,newerRoles.roles]
   assert s.roster == newerRoster
   ### reset for next battery
   s.roster = roster
+  s.roster_db = db
   ## Remove sched
   fullSched = player.Player("testPlayer#1111",roles=["Tank","DPS"])
   schedSched = player.Player("testPlayer#2222")
@@ -208,13 +240,17 @@ def test_updateRoster():
   schedRoster = [fullSched,schedSched,rolesSched]
   s.updateRoster(fullSched)
   assert s.roster[0] == fullSched
+  assert s.roster_db.get(fullSched.name) == [fullSched.sched,fullSched.roles]
   s.updateRoster(schedSched)
   assert s.roster[1] == schedSched
+  assert s.roster_db.get(schedSched.name) == [schedSched.sched,schedSched.roles]
   s.updateRoster(rolesSched)
   assert s.roster[2] == rolesSched
+  assert s.roster_db.get(rolesSched.name) == [rolesSched.sched,rolesSched.roles]
   assert s.roster == schedRoster
   ### reset for next battery
   s.roster = roster
+  s.roster_db = db
   ## Remove roles
   fullRoles = player.Player("testPlayer#1111",sched="Social")
   schedRoles = player.Player("testPlayer#2222",sched="Raider")
@@ -222,14 +258,90 @@ def test_updateRoster():
   rolesRoster = [fullRoles,schedRoles,rolesRoles]
   s.updateRoster(fullRoles)
   assert s.roster[0] == fullRoles
+  assert s.roster_db.get(fullRoles.name) == [fullRoles.sched,fullRoles.roles]
   s.updateRoster(schedRoles)
   assert s.roster[1] == schedRoles
+  assert s.roster_db.get(schedRoles.name) == [schedRoles.sched,schedRoles.roles]
   s.updateRoster(rolesRoles)
   assert s.roster[2] == rolesRoles
+  assert s.roster_db.get(rolesRoles.name) == [rolesRoles.sched,rolesRoles.roles]
   assert s.roster == rolesRoster
-
-  ## TODO - test writing to DB
 
   # clear out DBs
   os.remove(os.path.join(project_root,"databases","rosterTest.db","server.db"))
+  os.remove(os.path.join(project_root,"databases","rosterTest.db","roster.db"))
   os.rmdir(os.path.join(project_root,"databases","rosterTest.db"))
+  
+def test_getRoles():
+  """
+  GIVEN properly constructed Server object and list of Role objects
+  WHEN function is called
+  THEN get the identifiers for the Role objects from the database
+  """
+  
+  # Create test Role based on discord.Role but only with features that I might care about checking later
+  class Role(object):
+    def __init__(self,name,guild,id):
+      self.name = name
+      self.guild = guild
+      self.id = id
+  # Make the list of roles to use as input
+  raider = Role("Raider","0001",1111)
+  social = Role("Social","0001",2222)
+  member = Role("Member","0001",3333)
+  pug = Role("Pug","0001",4444)
+  nonce = Role("Other","0001",5555)
+  roles = [raider,social,member,pug,nonce]
+  
+  # Make the client and create the databases
+  client = None
+  client = server.SchedClient(command_prefix='!')
+  s = client.addServer(
+    id = "0001",
+    name = "Server for getRoles test",
+    owner = "TestOwner"
+  )
+  ## Map the role objects for this server
+  s.mapRole(raider,"Raider")
+  s.mapRole(social,"Social")
+  s.mapRole(member,"Member")
+  s.mapRole(pug,"PUG")
+  
+  # Clear the client and remake the same server
+  client = None
+  client = server.SchedClient(command_prefix='!')
+  client.setup()
+  # Make sure everything got built correctly
+  assert "0001" in client.server_ids
+  
+  # Tests
+  s = client.servers[client.server_ids.index("0001")]
+  ## Make sure setup got everything
+  assert s.Raider == 1111
+  assert s.Social == 2222
+  assert s.Member == 3333
+  assert s.PUG == 4444
+  ## All roles exist
+  s.getRoles(roles)
+  assert s.Raider == raider
+  assert s.Social == social
+  assert s.Member == member
+  assert s.PUG == pug
+  ## No raider role
+  ## No social role
+  ## No member role
+  ## No pug role
+  ## No roles
+  
+  # clear out DBs
+  os.remove(os.path.join(project_root,"databases","0001.db","server.db"))
+  os.remove(os.path.join(project_root,"databases","0001.db","roster.db"))
+  os.rmdir(os.path.join(project_root,"databases","0001.db"))
+
+  
+def test_getRoster():
+  """
+  GIVEN properly constructed Server object and appropriate inputs
+  WHEN function is called
+  THEN get the roster from the database
+  """
