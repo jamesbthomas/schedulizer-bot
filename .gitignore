@@ -130,3 +130,6 @@ dmypy.json
 
 # Repl.IT files
 .replit
+
+# DB files
+*.db
