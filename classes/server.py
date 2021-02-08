@@ -1,12 +1,13 @@
 # Defines the Server class and extends the Discord.Client class to track it
 
-import discord, pickledb, os
+import discord, pickledb, os, player
 from discord.ext import commands
 
 class Server(object):
     # Class for tracking properties by server
     
     def getRoles(self,roles):
+      self.db = pickledb.load(os.path.join(self.db_path,"server.db"), False)
       self.Raider = discord.utils.find(lambda r: r.id == self.Raider,roles)
       self.Social = discord.utils.find(lambda r: r.id == self.Social,roles)
       self.Member = discord.utils.find(lambda r: r.id == self.Member,roles)
@@ -14,6 +15,12 @@ class Server(object):
       return
      
     def getRoster(self):
+      self.roster_db = pickledb.load(os.path.join(self.db_path,"roster.db"),False)
+      names = self.roster_db.getall()
+      for name in names:
+        playerSettings = self.roster_db.get(name)
+        p = player.Player(name,sched=playerSettings[0],roles=playerSettings[1])
+        self.roster.append(p)
       return
 
     def mapRole(self,role,sched):
@@ -73,10 +80,10 @@ class Server(object):
         self.db.set('id',id)
         self.db.set('name',name)
         self.db.set('owner',str(owner))
-        self.Raider = self.db.get("Raider")
-        self.Social = self.db.get("Social")
-        self.Member = self.db.get("Member")
-        self.PUG = self.db.get("PUG")
+        self.Raider = self.db.get("Raider") or None
+        self.Social = self.db.get("Social") or None
+        self.Member = self.db.get("Member") or None
+        self.PUG = self.db.get("PUG") or None
         self.db.dump()
         # Create the database file for this server's roster
         self.roster_db = pickledb.load(os.path.join(self.db_path,"roster.db"),False)

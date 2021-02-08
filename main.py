@@ -32,7 +32,7 @@ async def on_ready():
   print('Connected to ' + str(len(client.guilds)) + " servers")
   for guild in client.guilds:
     if guild.id not in client.server_ids:
-      print("Name: ",guild.name,";\tID: ",guild.id,";\tOwner: ",guild.owner)
+      print("NEW\t\t-\tName: ",guild.name,";\tID: ",guild.id,";\tOwner: ",guild.owner)
       server = client.addServer(guild.id,guild.name,guild.owner)
       # Identify Role objects for schedulizer-based roles
       server.mapRole(discord.utils.find(lambda r: r.name == "Raider",guild.roles),"Raider")
@@ -47,7 +47,7 @@ async def on_ready():
         except AttributeError:
           continue
     else:
-      print("Server known")
+      print("KNOWN\t-\tName: ",guild.name,";\tID: ",guild.id,";\tOwner: ",guild.owner)
       server = client.servers[client.server_ids.index(guild.id)]
       server.getRoles(guild.roles)
       server.getRoster()
@@ -91,4 +91,4 @@ async def on_command_error(context,error):
 # Call the client run method of the previously created discord client, using the value of the TOKEN key in the current directory's environment file, .env
 load_dotenv()
 TOKEN = os.getenv('TOKEN')
-client.run(TOKEN)
+client.run("ODAzNjc0MTI2NjkwMTU2NTU1.YBBN2w.vML_xwOmJ8zQ1TPqoEit9kyBd0M")

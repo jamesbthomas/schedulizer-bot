@@ -101,6 +101,10 @@ def test_addServer():
       os.remove(os.path.join(project_root,"databases","test1.db",'roster.db'))
       os.rmdir(os.path.join(project_root,"databases","test1.db"))
       os.rmdir(os.path.join(project_root,"databases","test2.db"))
+      client.servers.pop(client.server_ids.index("test1"))
+      client.server_ids.pop(client.server_ids.index("test1"))
+      client.servers.pop(client.server_ids.index("test2"))
+      client.server_ids.pop(client.server_ids.index("test2"))
 
 def test_mapRoles():
   """
@@ -157,6 +161,8 @@ def test_mapRoles():
     os.remove(os.path.join(project_root,"databases","rolesTest.db","server.db"))
     os.remove(os.path.join(project_root,"databases","rolesTest.db","roster.db"))
     os.rmdir(os.path.join(project_root,"databases","rolesTest.db"))
+    client.servers.pop(client.server_ids.index("rolesTest"))
+    client.server_ids.pop(client.server_ids.index("rolesTest"))
 
 def test_updateRoster():
   """
@@ -271,6 +277,8 @@ def test_updateRoster():
     os.remove(os.path.join(project_root,"databases","rosterTest.db","server.db"))
     os.remove(os.path.join(project_root,"databases","rosterTest.db","roster.db"))
     os.rmdir(os.path.join(project_root,"databases","rosterTest.db"))
+    client.servers.pop(client.server_ids.index("rosterTest"))
+    client.server_ids.pop(client.server_ids.index("rosterTest"))
   
 def test_getRoles():
   """
@@ -311,37 +319,128 @@ def test_getRoles():
   client = None
   client = server.SchedClient(command_prefix='!')
   client.setup()
-  # Make sure everything got built correctly
-  assert "0001" in client.server_ids
-  
-  # Tests
-  s = client.servers[client.server_ids.index("0001")]
-  ## Make sure setup got everything
-  assert s.Raider == 1111
-  assert s.Social == 2222
-  assert s.Member == 3333
-  assert s.PUG == 4444
-  ## All roles exist
-  s.getRoles(roles)
-  assert s.Raider == raider
-  assert s.Social == social
-  assert s.Member == member
-  assert s.PUG == pug
-  ## No raider role
-  ## No social role
-  ## No member role
-  ## No pug role
-  ## No roles
-  
-  # clear out DBs
-  os.remove(os.path.join(project_root,"databases","0001.db","server.db"))
-  os.remove(os.path.join(project_root,"databases","0001.db","roster.db"))
-  os.rmdir(os.path.join(project_root,"databases","0001.db"))
+  try:
+    # Make sure everything got built correctly
+    assert "0001" in client.server_ids
+    
+    # Tests
+    s = client.servers[client.server_ids.index("0001")]
+    ## Make sure setup got everything
+    assert s.Raider == 1111
+    assert s.Social == 2222
+    assert s.Member == 3333
+    assert s.PUG == 4444
+    ## All roles exist
+    s.getRoles(roles)
+    assert s.Raider == raider
+    assert s.Social == social
+    assert s.Member == member
+    assert s.PUG == pug
+  finally:    
+    # clear out DBs
+    os.remove(os.path.join(project_root,"databases","0001.db","server.db"))
+    os.remove(os.path.join(project_root,"databases","0001.db","roster.db"))
+    os.rmdir(os.path.join(project_root,"databases","0001.db"))
+    client.servers.pop(client.server_ids.index("0001"))
+    client.server_ids.pop(client.server_ids.index("0001"))
 
+  # Roles aren't found
+
+  # Make the client and create the databases
+  client = None
+  client = server.SchedClient(command_prefix='!')
+  s = client.addServer(
+    id = "0002",
+    name = "Server for getRoles second test",
+    owner = "TestOwner"
+  )
+  ## Map the role objects for this server
+  ### Doesn't have a mapping for PUGs
+  s.mapRole(raider,"Raider")
+  s.mapRole(social,"Social")
+  s.mapRole(member,"Member")
   
+  # Clear the client and remake the same server
+  client = None
+  client = server.SchedClient(command_prefix='!')
+  client.setup()
+  try:
+    # Make sure everything got built correctly
+    assert "0002" in client.server_ids
+    
+    # Tests
+    s = client.servers[client.server_ids.index("0002")]
+    ## Make sure setup got everything
+    assert s.Raider == 1111
+    assert s.Social == 2222
+    assert s.Member == 3333
+    assert s.PUG == None
+    ## PUG does not exist
+    s.getRoles(roles)
+    assert s.Raider == raider
+    assert s.Social == social
+    assert s.Member == member
+    assert s.PUG == None
+  finally:    
+    # clear out DBs
+    os.remove(os.path.join(project_root,"databases","0002.db","server.db"))
+    os.remove(os.path.join(project_root,"databases","0002.db","roster.db"))
+    os.rmdir(os.path.join(project_root,"databases","0002.db"))
+    client.servers.pop(client.server_ids.index("0002"))
+    client.server_ids.pop(client.server_ids.index("0002"))
+ 
 def test_getRoster():
   """
   GIVEN properly constructed Server object and appropriate inputs
   WHEN function is called
   THEN get the roster from the database
   """
+
+  # Make the client and create the databases
+  client = None
+  client = server.SchedClient(command_prefix='!')
+  client.setup()
+  s = client.addServer(
+    id = "0001",
+    name = "Server for getRoster test",
+    owner = "TestOwner"
+  )
+  ## Create the player objects for this server
+  fullPlayer = player.Player("testPlayer#1111",sched="Social",roles=["Tank","DPS"])
+  schedPlayer = player.Player("testPlayer#2222",sched="Raider")
+  rolesPlayer = player.Player("testPlayer#3333",roles=["Healer","DPS"])
+  s.updateRoster(fullPlayer)
+  s.updateRoster(schedPlayer)
+  s.updateRoster(rolesPlayer)
+  
+  # Clear the client and remake the same server
+  client = None
+  client = server.SchedClient(command_prefix='!')
+  client.setup()
+  try:
+    # Make sure everything got built correctly
+    assert "0001" in client.server_ids
+    # Tests
+    s = client.servers[client.server_ids.index("0001")]
+    s.getRoster()
+    ## Check database
+    assert s.roster_db.get(fullPlayer.name) == [fullPlayer.sched,fullPlayer.roles]
+    assert s.roster_db.get(schedPlayer.name) == [schedPlayer.sched,schedPlayer.roles]
+    assert s.roster_db.get(rolesPlayer.name) == [rolesPlayer.sched,rolesPlayer.roles]
+    ## Check server attribute
+    assert s.roster[0].name == fullPlayer.name or s.roster[0].name == schedPlayer.name or s.roster[0].name == rolesPlayer.name
+    assert s.roster[1].name == fullPlayer.name or s.roster[1].name == schedPlayer.name or s.roster[1].name == rolesPlayer.name
+    assert s.roster[2].name == fullPlayer.name or s.roster[2].name == schedPlayer.name or s.roster[2].name == rolesPlayer.name
+    assert s.roster[0].sched == fullPlayer.sched or s.roster[0].sched == schedPlayer.sched or s.roster[0].sched == rolesPlayer.sched
+    assert s.roster[1].sched == fullPlayer.sched or s.roster[1].sched == schedPlayer.sched or s.roster[1].sched == rolesPlayer.sched
+    assert s.roster[2].sched == fullPlayer.sched or s.roster[2].sched == schedPlayer.sched or s.roster[2].sched == rolesPlayer.sched
+    assert s.roster[0].roles == fullPlayer.roles or s.roster[0].roles == schedPlayer.roles or s.roster[0].roles == rolesPlayer.roles
+    assert s.roster[1].roles == fullPlayer.roles or s.roster[1].roles == schedPlayer.roles or s.roster[1].roles == rolesPlayer.roles
+    assert s.roster[2].roles == fullPlayer.roles or s.roster[2].roles == schedPlayer.roles or s.roster[2].roles == rolesPlayer.roles
+  finally:
+    # clear out DBs
+    os.remove(os.path.join(project_root,"databases","0001.db","server.db"))
+    os.remove(os.path.join(project_root,"databases","0001.db","roster.db"))
+    os.rmdir(os.path.join(project_root,"databases","0001.db"))
+    client.servers.pop(client.server_ids.index("0001"))
+    client.server_ids.pop(client.server_ids.index("0001"))
