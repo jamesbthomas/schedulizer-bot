@@ -71,36 +71,36 @@ def test_addServer():
         name = "name for second",
         owner = "ServerOwner#2"
     )
-    
-    assert client.servers[0].id == "test1"
-    assert client.servers[0].name == "name for test"
-    assert client.servers[0].owner == "ServerOwner#1"
-    assert client.servers[1].id == "test2"
-    assert client.servers[1].name == "name for second"
-    assert client.servers[1].owner == "ServerOwner#2"
-    
-    # Add server with same id (should raise exception)
+    try:
+      assert client.servers[0].id == "test1"
+      assert client.servers[0].name == "name for test"
+      assert client.servers[0].owner == "ServerOwner#1"
+      assert client.servers[1].id == "test2"
+      assert client.servers[1].name == "name for second"
+      assert client.servers[1].owner == "ServerOwner#2"
+      
+      # Add server with same id (should raise exception)
 
-    with pytest.raises(FileExistsError,match="Server already known"):
-        client.addServer(id = "test1",name = "third test",owner = "Owner")
+      with pytest.raises(FileExistsError,match="Server already known"):
+          client.addServer(id = "test1",name = "third test",owner = "Owner")
 
-    # Check for database creation
-    assert client.servers[0].db_path == os.path.join(project_root,"databases","test1.db")
-    assert client.servers[0].db.get('owner') == "ServerOwner#1"
-    assert client.servers[0].db.get('id') == "test1"
-    assert client.servers[0].db.get('name') == "name for test"
-    assert client.servers[1].db_path == os.path.join(project_root,"databases","test2.db")
-    assert client.servers[1].db.get('owner') == "ServerOwner#2"
-    assert client.servers[1].db.get('id') == "test2"
-    assert client.servers[1].db.get('name') == "name for second"
-
-    # clear out DBs from this test
-    os.remove(os.path.join(project_root,"databases","test2.db",'server.db'))
-    os.remove(os.path.join(project_root,"databases","test1.db",'server.db'))
-    os.remove(os.path.join(project_root,"databases","test2.db",'roster.db'))
-    os.remove(os.path.join(project_root,"databases","test1.db",'roster.db'))
-    os.rmdir(os.path.join(project_root,"databases","test1.db"))
-    os.rmdir(os.path.join(project_root,"databases","test2.db"))
+      # Check for database creation
+      assert client.servers[0].db_path == os.path.join(project_root,"databases","test1.db")
+      assert client.servers[0].db.get('owner') == "ServerOwner#1"
+      assert client.servers[0].db.get('id') == "test1"
+      assert client.servers[0].db.get('name') == "name for test"
+      assert client.servers[1].db_path == os.path.join(project_root,"databases","test2.db")
+      assert client.servers[1].db.get('owner') == "ServerOwner#2"
+      assert client.servers[1].db.get('id') == "test2"
+      assert client.servers[1].db.get('name') == "name for second"
+    finally:
+      # clear out DBs from this test
+      os.remove(os.path.join(project_root,"databases","test2.db",'server.db'))
+      os.remove(os.path.join(project_root,"databases","test1.db",'server.db'))
+      os.remove(os.path.join(project_root,"databases","test2.db",'roster.db'))
+      os.remove(os.path.join(project_root,"databases","test1.db",'roster.db'))
+      os.rmdir(os.path.join(project_root,"databases","test1.db"))
+      os.rmdir(os.path.join(project_root,"databases","test2.db"))
 
 def test_mapRoles():
   """
@@ -138,26 +138,25 @@ def test_mapRoles():
   client.servers[0].mapRole(testMember,"Member")
   client.servers[0].mapRole(testPUG,"PUG")
 
-  print(client.servers[0].Raider)
-
-  # Tests
-  assert client.servers[0].Raider == testRaider
-  assert client.servers[0].Social == testSocial
-  assert client.servers[0].Member == testMember
-  assert client.servers[0].PUG == testPUG
-  # Exception handling
-  with pytest.raises(AttributeError,match="Unknown Schedule option"):
-    client.servers[0].mapRole(testRaider,"bad")
-  # Test DB writes
-  assert client.servers[0].db.get("Raider") == testRaider.id
-  assert client.servers[0].db.get("Social") == testSocial.id
-  assert client.servers[0].db.get("Member") == testMember.id
-  assert client.servers[0].db.get("PUG") == testPUG.id
-
-  # clear out DBs
-  os.remove(os.path.join(project_root,"databases","rolesTest.db","server.db"))
-  os.remove(os.path.join(project_root,"databases","rolesTest.db","roster.db"))
-  os.rmdir(os.path.join(project_root,"databases","rolesTest.db"))
+  try:
+    # Tests
+    assert client.servers[0].Raider == testRaider
+    assert client.servers[0].Social == testSocial
+    assert client.servers[0].Member == testMember
+    assert client.servers[0].PUG == testPUG
+    # Exception handling
+    with pytest.raises(AttributeError,match="Unknown Schedule option"):
+      client.servers[0].mapRole(testRaider,"bad")
+    # Test DB writes
+    assert client.servers[0].db.get("Raider") == testRaider.id
+    assert client.servers[0].db.get("Social") == testSocial.id
+    assert client.servers[0].db.get("Member") == testMember.id
+    assert client.servers[0].db.get("PUG") == testPUG.id
+  finally:
+    # clear out DBs
+    os.remove(os.path.join(project_root,"databases","rolesTest.db","server.db"))
+    os.remove(os.path.join(project_root,"databases","rolesTest.db","roster.db"))
+    os.rmdir(os.path.join(project_root,"databases","rolesTest.db"))
 
 def test_updateRoster():
   """
@@ -183,94 +182,95 @@ def test_updateRoster():
   rolesPlayer = player.Player("testPlayer#3333",roles=["Healer","DPS"])
   roster = [fullPlayer,schedPlayer,rolesPlayer]
   
-  # Tests
-  ## Add to empty roster
-  s.updateRoster(fullPlayer)
-  assert s.roster[0] == fullPlayer
-  assert s.roster_db.get(fullPlayer.name) == [fullPlayer.sched,fullPlayer.roles]
-  s.updateRoster(schedPlayer)
-  assert s.roster[1] == schedPlayer
-  assert s.roster_db.get(schedPlayer.name) == [schedPlayer.sched,schedPlayer.roles]
-  s.updateRoster(rolesPlayer)
-  assert s.roster[2] == rolesPlayer
-  assert s.roster_db.get(rolesPlayer.name) == [rolesPlayer.sched,rolesPlayer.roles]
-  assert s.roster == roster
-  ## Capture the database at this stage so we can reset to it later
-  db = s.roster_db
-  ## Change/Add schedules
-  newFull = player.Player("testPlayer#1111",sched="Raider",roles=["Tank","DPS"])
-  newSched = player.Player("testPlayer#2222",sched="Social")
-  newRoles = player.Player("testPlayer#3333",sched="Member",roles=["Healer","DPS"])
-  newRoster = [newFull,newSched,newRoles]
-  s.updateRoster(newFull)
-  assert s.roster[0] == newFull
-  assert s.roster_db.get(newFull.name) == [newFull.sched,newFull.roles]
-  s.updateRoster(newSched)
-  assert s.roster[1] == newSched
-  assert s.roster_db.get(newSched.name) == [newSched.sched,newSched.roles]
-  s.updateRoster(newRoles)
-  assert s.roster[2] == newRoles
-  assert s.roster_db.get(newRoles.name) == [newRoles.sched,newRoles.roles]
-  assert s.roster == newRoster
-  ### Reset for next battery
-  s.roster = roster
-  s.roster_db = db
-  ## Change/add Roles
-  newerFull = player.Player("testPlayer#1111",sched="Raider",roles=["Tank"])
-  newerSched = player.Player("testPlayer#2222",sched="Social",roles=["DPS"])
-  newerRoles = player.Player("testPlayer#3333",roles=["Tank","Healer","DPS"])
-  newerRoster = [newerFull,newerSched,newerRoles]
-  s.updateRoster(newerFull)
-  assert s.roster[0] == newerFull
-  assert s.roster_db.get(newerFull.name) == [newerFull.sched,newerFull.roles]
-  s.updateRoster(newerSched)
-  assert s.roster[1] == newerSched
-  assert s.roster_db.get(newerSched.name) == [newerSched.sched,newerSched.roles]
-  s.updateRoster(newerRoles)
-  assert s.roster[2] == newerRoles
-  assert s.roster_db.get(newerRoles.name) == [newerRoles.sched,newerRoles.roles]
-  assert s.roster == newerRoster
-  ### reset for next battery
-  s.roster = roster
-  s.roster_db = db
-  ## Remove sched
-  fullSched = player.Player("testPlayer#1111",roles=["Tank","DPS"])
-  schedSched = player.Player("testPlayer#2222")
-  rolesSched = player.Player("testPlayer#3333",roles=["Healer","DPS"])
-  schedRoster = [fullSched,schedSched,rolesSched]
-  s.updateRoster(fullSched)
-  assert s.roster[0] == fullSched
-  assert s.roster_db.get(fullSched.name) == [fullSched.sched,fullSched.roles]
-  s.updateRoster(schedSched)
-  assert s.roster[1] == schedSched
-  assert s.roster_db.get(schedSched.name) == [schedSched.sched,schedSched.roles]
-  s.updateRoster(rolesSched)
-  assert s.roster[2] == rolesSched
-  assert s.roster_db.get(rolesSched.name) == [rolesSched.sched,rolesSched.roles]
-  assert s.roster == schedRoster
-  ### reset for next battery
-  s.roster = roster
-  s.roster_db = db
-  ## Remove roles
-  fullRoles = player.Player("testPlayer#1111",sched="Social")
-  schedRoles = player.Player("testPlayer#2222",sched="Raider")
-  rolesRoles = player.Player("testPlayer#3333")
-  rolesRoster = [fullRoles,schedRoles,rolesRoles]
-  s.updateRoster(fullRoles)
-  assert s.roster[0] == fullRoles
-  assert s.roster_db.get(fullRoles.name) == [fullRoles.sched,fullRoles.roles]
-  s.updateRoster(schedRoles)
-  assert s.roster[1] == schedRoles
-  assert s.roster_db.get(schedRoles.name) == [schedRoles.sched,schedRoles.roles]
-  s.updateRoster(rolesRoles)
-  assert s.roster[2] == rolesRoles
-  assert s.roster_db.get(rolesRoles.name) == [rolesRoles.sched,rolesRoles.roles]
-  assert s.roster == rolesRoster
-
-  # clear out DBs
-  os.remove(os.path.join(project_root,"databases","rosterTest.db","server.db"))
-  os.remove(os.path.join(project_root,"databases","rosterTest.db","roster.db"))
-  os.rmdir(os.path.join(project_root,"databases","rosterTest.db"))
+  try:
+    # Tests
+    ## Add to empty roster
+    s.updateRoster(fullPlayer)
+    assert s.roster[0] == fullPlayer
+    assert s.roster_db.get(fullPlayer.name) == [fullPlayer.sched,fullPlayer.roles]
+    s.updateRoster(schedPlayer)
+    assert s.roster[1] == schedPlayer
+    assert s.roster_db.get(schedPlayer.name) == [schedPlayer.sched,schedPlayer.roles]
+    s.updateRoster(rolesPlayer)
+    assert s.roster[2] == rolesPlayer
+    assert s.roster_db.get(rolesPlayer.name) == [rolesPlayer.sched,rolesPlayer.roles]
+    assert s.roster == roster
+    ## Capture the database at this stage so we can reset to it later
+    db = s.roster_db
+    ## Change/Add schedules
+    newFull = player.Player("testPlayer#1111",sched="Raider",roles=["Tank","DPS"])
+    newSched = player.Player("testPlayer#2222",sched="Social")
+    newRoles = player.Player("testPlayer#3333",sched="Member",roles=["Healer","DPS"])
+    newRoster = [newFull,newSched,newRoles]
+    s.updateRoster(newFull)
+    assert s.roster[0] == newFull
+    assert s.roster_db.get(newFull.name) == [newFull.sched,newFull.roles]
+    s.updateRoster(newSched)
+    assert s.roster[1] == newSched
+    assert s.roster_db.get(newSched.name) == [newSched.sched,newSched.roles]
+    s.updateRoster(newRoles)
+    assert s.roster[2] == newRoles
+    assert s.roster_db.get(newRoles.name) == [newRoles.sched,newRoles.roles]
+    assert s.roster == newRoster
+    ### Reset for next battery
+    s.roster = roster
+    s.roster_db = db
+    ## Change/add Roles
+    newerFull = player.Player("testPlayer#1111",sched="Raider",roles=["Tank"])
+    newerSched = player.Player("testPlayer#2222",sched="Social",roles=["DPS"])
+    newerRoles = player.Player("testPlayer#3333",roles=["Tank","Healer","DPS"])
+    newerRoster = [newerFull,newerSched,newerRoles]
+    s.updateRoster(newerFull)
+    assert s.roster[0] == newerFull
+    assert s.roster_db.get(newerFull.name) == [newerFull.sched,newerFull.roles]
+    s.updateRoster(newerSched)
+    assert s.roster[1] == newerSched
+    assert s.roster_db.get(newerSched.name) == [newerSched.sched,newerSched.roles]
+    s.updateRoster(newerRoles)
+    assert s.roster[2] == newerRoles
+    assert s.roster_db.get(newerRoles.name) == [newerRoles.sched,newerRoles.roles]
+    assert s.roster == newerRoster
+    ### reset for next battery
+    s.roster = roster
+    s.roster_db = db
+    ## Remove sched
+    fullSched = player.Player("testPlayer#1111",roles=["Tank","DPS"])
+    schedSched = player.Player("testPlayer#2222")
+    rolesSched = player.Player("testPlayer#3333",roles=["Healer","DPS"])
+    schedRoster = [fullSched,schedSched,rolesSched]
+    s.updateRoster(fullSched)
+    assert s.roster[0] == fullSched
+    assert s.roster_db.get(fullSched.name) == [fullSched.sched,fullSched.roles]
+    s.updateRoster(schedSched)
+    assert s.roster[1] == schedSched
+    assert s.roster_db.get(schedSched.name) == [schedSched.sched,schedSched.roles]
+    s.updateRoster(rolesSched)
+    assert s.roster[2] == rolesSched
+    assert s.roster_db.get(rolesSched.name) == [rolesSched.sched,rolesSched.roles]
+    assert s.roster == schedRoster
+    ### reset for next battery
+    s.roster = roster
+    s.roster_db = db
+    ## Remove roles
+    fullRoles = player.Player("testPlayer#1111",sched="Social")
+    schedRoles = player.Player("testPlayer#2222",sched="Raider")
+    rolesRoles = player.Player("testPlayer#3333")
+    rolesRoster = [fullRoles,schedRoles,rolesRoles]
+    s.updateRoster(fullRoles)
+    assert s.roster[0] == fullRoles
+    assert s.roster_db.get(fullRoles.name) == [fullRoles.sched,fullRoles.roles]
+    s.updateRoster(schedRoles)
+    assert s.roster[1] == schedRoles
+    assert s.roster_db.get(schedRoles.name) == [schedRoles.sched,schedRoles.roles]
+    s.updateRoster(rolesRoles)
+    assert s.roster[2] == rolesRoles
+    assert s.roster_db.get(rolesRoles.name) == [rolesRoles.sched,rolesRoles.roles]
+    assert s.roster == rolesRoster
+  finally:
+    # clear out DBs
+    os.remove(os.path.join(project_root,"databases","rosterTest.db","server.db"))
+    os.remove(os.path.join(project_root,"databases","rosterTest.db","roster.db"))
+    os.rmdir(os.path.join(project_root,"databases","rosterTest.db"))
   
 def test_getRoles():
   """
