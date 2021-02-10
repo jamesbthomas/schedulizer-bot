@@ -60,13 +60,40 @@ class Raid(Event):
     self.dps = []
     self.comp = []
     scheds = ["Raider","Social","Member","PUG"]
+    # Determine composition
+    ## based on total number of raiders and socials signed up (ignores pugs)
+    nonPugs = list(filter(lambda p: p.sched != "PUG",roster))
+    if len(nonPugs) <= 10:
+      self.comp = self.comps[0]
+    elif len(nonPugs) <= 15:
+      self.comp = self.comps[1]
+    elif len(nonPugs) <= 20:
+      self.comp = self.comps[2]
+    elif len(nonPugs) <= 25:
+      self.comp = self.comps[3]
+    elif len(nonPugs) <= 30:
+      self.comp = self.comps[4]
+    else: # More than 30 people signed up for the raid
+      print("HERE",len(roster),len(nonPugs))
+      # Filter out PUG players, then Member players, then Social players until we are under 30 people
+      rev = scheds[::-1]
+      ## Already filtered out the PUGs, so we start by removing the Members
+      print(scheds,rev)
+      index = 1
+      roster = nonPugs
+      while len(roster) > 30 and index < len(rev)-1:
+        print("filtering",rev[index])
+        roster = list(filter(lambda p: p.sched != rev[index],roster))
+        index += 1
+      # Still too many people? throw an error
+      if len(roster) > 30:
+        raise ValueError("Too many Raiders")
+      else:
+        self.comp = self.comps[4]
     # SELECT TANKS
     tanks_unsort = list(filter(lambda p: "Tank" in p.roles,roster))
     t = sorted(tanks_unsort,key=lambda p: p.roles.index("Tank"))
     tanks = sorted(t,key=lambda p: 0 if p.sched == "Raider" or p.sched =="Social" else 1 if p.sched == "Member" else 2)
-    print("unsort",list(map(lambda p: p.name,tanks_unsort)))
-    print("pref sort",list(map(lambda p: p.name,tanks)))
-    print("sched sort",list(map(lambda p: p.name,tanks)))
     # If there are only two people, skip all the advanced logic
     if len(tanks) <= 2:
       self.tanks = tanks
@@ -93,30 +120,6 @@ class Raid(Event):
       roster.pop(roster.index(t))
 
     # SELECT HEALERS
-    ## Determine composition
-    ### number of healers is based on total number of players, 1x healer per 5 players
-    if len(roster)+2 <= 10:
-      self.comp = self.comps[0]
-    elif len(roster)+2 <= 15:
-      self.comp = self.comps[1]
-    elif len(roster)+2 <= 20:
-      self.comp = self.comps[2]
-    elif len(roster)+2 <= 25:
-      self.comp = self.comps[3]
-    elif len(roster)+2 <= 30:
-      self.comp = self.comps[4]
-    else: # More than 30 people signed up for the raid
-      # Filter out PUG players, then Member players, then Social players until we are under 30 people
-      rev = scheds.reverse()
-      index = 0
-      while len(roster) > 30 and len(rev) < index:
-        roster = list(filter(lambda p: p.sched != rev[index],roster))
-        index += 1
-      # Still too many people? throw an error
-      if len(roster) > 30:
-        raise ValueError("Too many Raiders")
-      else:
-        self.comp = self.comps[4]
     ## Pick healers
     healers = list(filter(lambda p: "Healer" in p.roles,roster))
     # If there are enough healers for the comp, skip the advanced logic
@@ -131,7 +134,7 @@ class Raid(Event):
           healers.pop(index)
           self.healers.append(healer)
         index += 1
-      # Select Raider tanks, then Social tanks, then Member tanks, then PUG tanks
+      # Select Raider healers, then social healers, etc
       index = 0
       while len(self.healers) < 2 and index < len(scheds):
         pick = pickPlayer("Healer",healers,scheds[index])
@@ -143,27 +146,23 @@ class Raid(Event):
     ## Remove those selected as healers from the list of available players
     for h in self.healers:
       roster.pop(roster.index(h))
-
-    print(list(map(lambda p: p.name,roster)))
-    print("TANKS - ",list(map(lambda p: p.name,self.tanks)))
-    print("HEALERS - ",list(map(lambda p: p.name,self.healers)))
+    
     # SELECT DPS
     ## already know how many we need, just gotta go by schedule priority
     dps = list(filter(lambda p: "DPS" in p.roles,roster))
-    print("DPS - ",list(map(lambda p: p.name,dps)))
-    # If there are enough healers for the comp, skip the advanced logic
+    # If there are enough dps for the comp, skip the advanced logic
     if len(dps) <= self.comp[2]:
       self.dps = dps
-    else: # We have more than two people who want to play tank
-      # Select players who only play healer first (as long as they are not a PUG)
+    else: # We have more than the required who want to play dps
+      # Select players who only play dps first (as long as they are not a PUG)
       index = 0
       while len(self.dps) < self.comp[2] and index < len(dps):
         d = dps[index]
         if d.roles == ["DPS"] and d.sched != "PUG":
           dps.pop(index)
-          self.dps.append(dps)
+          self.dps.append(d)
         index += 1
-      # Select Raider tanks, then Social tanks, then Member tanks, then PUG tanks
+      # Select Raider dps, then member dps, etc
       index = 0
       while len(self.dps) < self.comp[2] and index < len(scheds):
         pick = pickPlayer("DPS",dps,scheds[index])
@@ -172,11 +171,15 @@ class Raid(Event):
         else:
           dps.pop(dps.index(pick))
           self.dps.append(pick)
-    ## Remove those selected as healers from the list of available players
+    
+    ## Remove those selected as dps from the list of available players
     for d in self.dps:
       roster.pop(roster.index(d))
-
-    print("BREAKBREAKBREAK")
+    
+    #print("TANKS - ",list(map(lambda p: p.name,self.tanks)))
+    #print("HEALERS - ",list(map(lambda p: p.name,self.healers)))
+    #print("DPS - ",list(map(lambda p: p.name,self.dps)))
+    #print("BREAKBREAKBREAK")
 
   def __init__(self,date: datetime,recurring: bool,description: str,frequency: str = None):
     super().__init__(date,recurring,description,frequency)

@@ -89,9 +89,9 @@ def test_cookRaid():
   healerDPSTankS = player.Player("HealerDPSTankS","Social",["Healer","DPS","Tank"])
   DPSTankHealerS = player.Player("DPSTankHealerS","Social",["DPS","Tank","Healer"])
   DPSHealerTankS = player.Player("DPSHealerTankS","Social",["DPS","Healer","Tank"])
-  tankS = player.Player("TankS","Raider",["Tank"])
-  healerS = player.Player("HealerS","Raider",["Healer"])
-  DPSS = player.Player("DPSS","Raider",["DPS"])
+  tankS = player.Player("TankS","Social",["Tank"])
+  healerS = player.Player("HealerS","Social",["Healer"])
+  DPSS = player.Player("DPSS","Social",["DPS"])
   ## Create Member Player Objects
   tankHealerDPSM = player.Player("TankHealerDPSM","Member",["Tank","Healer","DPS"])
   healerTankDPSM = player.Player("HealerTankDPSM","Member",["Healer","Tank","DPS"])
@@ -99,9 +99,9 @@ def test_cookRaid():
   healerDPSTankM = player.Player("HealerDPSTankM","Member",["Healer","DPS","Tank"])
   DPSTankHealerM = player.Player("DPSTankHealerM","Member",["DPS","Tank","Healer"])
   DPSHealerTankM = player.Player("DPSHealerTankM","Member",["DPS","Healer","Tank"])
-  tankM = player.Player("TankM","Raider",["Tank"])
-  healerM = player.Player("HealerM","Raider",["Healer"])
-  DPSM = player.Player("DPSM","Raider",["DPS"])
+  tankM = player.Player("TankM","Member",["Tank"])
+  healerM = player.Player("HealerM","Member",["Healer"])
+  DPSM = player.Player("DPSM","Member",["DPS"])
   ## Create PUG Player Objects
   tankHealerDPSP = player.Player("TankHealerDPSP","PUG",["Tank","Healer","DPS"])
   healerTankDPSP = player.Player("HealerTankDPSP","PUG",["Healer","Tank","DPS"])
@@ -109,9 +109,9 @@ def test_cookRaid():
   healerDPSTankP = player.Player("HealerDPSTankP","PUG",["Healer","DPS","Tank"])
   DPSTankHealerP = player.Player("DPSTankHealerP","PUG",["DPS","Tank","Healer"])
   DPSHealerTankP = player.Player("DPSHealerTankP","PUG",["DPS","Healer","Tank"])
-  tankP = player.Player("TankP","Raider",["Tank"])
-  healerP = player.Player("HealerP","Raider",["Healer"])
-  DPSP = player.Player("DPSP","Raider",["DPS"])
+  tankP = player.Player("TankP","PUG",["Tank"])
+  healerP = player.Player("HealerP","PUG",["Healer"])
+  DPSP = player.Player("DPSP","PUG",["DPS"])
 
   # Create the Raid event
   raid = event.Raid(datetime.datetime(1970,1,1,0,0,0),False,"Raid.cook() Test")
@@ -134,62 +134,62 @@ def test_cookRaid():
   roster = [tankR,tankM,healerR,healerS,DPSR,DPSR,DPSR,DPSR,DPSS,DPSM]
   raid.cook(roster)
   assert raid.tanks == [tankR,tankM]
-  assert raid.healers == [healerR,healerS]
-  assert raid.dps == [DPSR,DPSR,DPSR,DPSR,DPSS,DPSM]
+  assert raid.healers.sort(key=lambda p: p.name)== [healerR,healerS].sort(key=lambda p: p.name)
+  assert raid.dps.sort(key=lambda p: p.name)== [DPSR,DPSR,DPSR,DPSR,DPSS,DPSM].sort(key=lambda p: p.name)
   assert raid.comp == [2,2,6]
   ### Select Raiders to tank and heal before other members
   roster = [tankR,tankDPSHealerS,healerR,healerDPSTankS,DPSR,DPSR,DPSR,DPSR,DPSHealerTankR,DPSTankHealerR]
   raid.cook(roster)
   assert raid.tanks == [tankR,DPSTankHealerR]
-  assert raid.healers == [healerR,DPSHealerTankR]
-  assert raid.dps == [DPSR,DPSR,DPSR,DPSR,tankDPSHealerS,healerDPSTankS]
+  assert raid.healers.sort(key=lambda p: p.name)== [healerR,DPSHealerTankR].sort(key=lambda p: p.name)
+  assert raid.dps.sort(key=lambda p: p.name)== [DPSR,DPSR,DPSR,DPSR,tankDPSHealerS,healerDPSTankS].sort(key=lambda p: p.name)
   assert raid.comp == [2,2,6]
   roster = [tankR,tankDPSHealerM,healerR,healerDPSTankM,DPSR,DPSR,DPSR,DPSR,DPSHealerTankR,DPSTankHealerR]
   raid.cook(roster)
   assert raid.tanks == [tankR,DPSTankHealerR]
-  assert raid.healers == [healerR,DPSHealerTankR]
-  assert raid.dps == [DPSR,DPSR,DPSR,DPSR,tankDPSHealerM,healerDPSTankM]
+  assert raid.healers.sort(key=lambda p: p.name)== [healerR,DPSHealerTankR].sort(key=lambda p: p.name)
+  assert raid.dps.sort(key=lambda p: p.name)== [DPSR,DPSR,DPSR,DPSR,tankDPSHealerM,healerDPSTankM].sort(key=lambda p: p.name)
   assert raid.comp == [2,2,6]
   ## 11 Players
   ### All Members/Social/Raiders should select larger composition
   roster = [tankR,tankM,healerR,healerS,DPSR,DPSR,DPSR,DPSR,DPSS,DPSM,DPSR]
   raid.cook(roster)
   assert raid.tanks == [tankR,tankM]
-  assert raid.healers == [healerR,healerS]
-  assert raid.dps == [DPSR,DPSR,DPSR,DPSR,DPSS,DPSM,DPSR]
+  assert raid.healers.sort(key=lambda p: p.name)== [healerR,healerS].sort(key=lambda p: p.name)
+  assert raid.dps.sort(key=lambda p: p.name)== [DPSR,DPSR,DPSR,DPSR,DPSS,DPSM,DPSR].sort(key=lambda p: p.name)
   assert raid.comp == [2,3,10]
   ### Extra PUG should select lower composition
   roster = [tankR,tankM,healerR,healerS,DPSR,DPSR,DPSR,DPSR,DPSS,DPSM,DPSP]
   raid.cook(roster)
-  assert raid.tanks == [tankR,tankR]
-  assert raid.healers == [healerR,healerR]
-  assert raid.dps == [DPSR,DPSR,DPSR,DPSR,DPSR,DPSR]
+  assert raid.tanks == [tankR,tankM]
+  assert raid.healers.sort(key=lambda p: p.name)== [healerR,healerR].sort(key=lambda p: p.name)
+  assert raid.dps.sort(key=lambda p: p.name)== [DPSR,DPSR,DPSR,DPSR,DPSR,DPSR].sort(key=lambda p: p.name)
   assert raid.comp == [2,2,6]
   ### Should prefer healers instead of dps for extra
   roster = [tankR,tankM,healerR,healerS,DPSR,DPSR,DPSR,DPSR,DPSS,DPSM,DPSHealerTankR]
   raid.cook(roster)
-  assert raid.tanks == [tankR,tankR]
-  assert raid.healers == [healerR,healerR,DPSHealerTankR]
-  assert raid.dps == [DPSR,DPSR,DPSR,DPSR,DPSR,DPSR]
-  assert raid.compt == [2,3,10]
+  assert raid.tanks == [tankR,tankM]
+  assert raid.healers.sort(key=lambda p: p.name)== [healerR,healerR,DPSHealerTankR].sort(key=lambda p: p.name)
+  assert raid.dps.sort(key=lambda p: p.name)== [DPSR,DPSR,DPSR,DPSR,DPSR,DPSR].sort(key=lambda p: p.name)
+  assert raid.comp == [2,3,10]
   roster = [tankR,tankM,healerR,healerS,DPSR,DPSR,DPSR,DPSR,DPSS,DPSM,DPSTankHealerR]
   raid.cook(roster)
-  assert raid.tanks == [tankR,tankR]
-  assert raid.healers == [healerR,healerR,DPSTankHealerR]
-  assert raid.dps == [DPSR,DPSR,DPSR,DPSR,DPSR,DPSR]
-  assert raid.compt == [2,3,10]
-  ### Should prefer dps instead of tanks for extra
-  roster = [tankR,tankR,healerR,healerR,DPSR,DPSR,DPSR,DPSR,DPSR,DPSR,TankDPSHealerR]
-  raid.cook(roster)
-  assert raid.tanks == [tankR,tankR]
-  assert raid.healers == [healerR,healerR]
-  assert raid.dps == [DPSR,DPSR,DPSR,DPSR,DPSR,DPSR,TankDPSHealerR]
+  assert raid.tanks == [tankR,tankM]
+  assert raid.healers.sort(key=lambda p: p.name)== [healerR,healerR,DPSTankHealerR].sort(key=lambda p: p.name)
+  assert raid.dps.sort(key=lambda p: p.name)== [DPSR,DPSR,DPSR,DPSR,DPSR,DPSR].sort(key=lambda p: p.name)
   assert raid.comp == [2,3,10]
-  roster = [tankR,tankR,healerR,healerR,DPSR,DPSR,DPSR,DPSR,DPSR,DPSR,TankHealerDPSR]
+  ### Should prefer dps instead of tanks for extra
+  roster = [tankR,tankR,healerR,healerR,DPSR,DPSR,DPSR,DPSR,DPSR,DPSR,tankDPSHealerR]
   raid.cook(roster)
   assert raid.tanks == [tankR,tankR]
-  assert raid.healers == [healerR,healerR,TankHealerDPSR]
-  assert raid.dps == [DPSR,DPSR,DPSR,DPSR,DPSR,DPSR]
+  assert raid.healers.sort(key=lambda p: p.name)== [healerR,healerR].sort(key=lambda p: p.name)
+  assert raid.dps.sort(key=lambda p: p.name)== [DPSR,DPSR,DPSR,DPSR,DPSR,DPSR,tankDPSHealerR].sort(key=lambda p: p.name)
+  assert raid.comp == [2,3,10]
+  roster = [tankR,tankR,healerR,healerR,DPSR,DPSR,DPSR,DPSR,DPSR,DPSR,tankHealerDPSR]
+  raid.cook(roster)
+  assert raid.tanks == [tankR,tankR]
+  assert raid.healers.sort(key=lambda p: p.name)== [healerR,healerR,tankHealerDPSR].sort(key=lambda p: p.name)
+  assert raid.dps.sort(key=lambda p: p.name)== [DPSR,DPSR,DPSR,DPSR,DPSR,DPSR].sort(key=lambda p: p.name)
   assert raid.comp == [2,3,10]
   ## 15 Players should select [2,3,10]
   roster = [tankHealerDPSR] * 15
@@ -231,24 +231,24 @@ def test_cookRaid():
   roster += [tankHealerDPSS]
   raid.cook(roster)
   assert raid.tanks == [tankHealerDPSR,tankHealerDPSR]
-  assert raid.healers == [tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR]
-  assert raid.DPS == [tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR]
+  assert raid.healers.sort(key=lambda p: p.name)== [tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR].sort(key=lambda p: p.name)
+  assert raid.dps.sort(key=lambda p: p.name)== [tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR].sort(key=lambda p: p.name)
   assert raid.comp == [2,6,22]
   ### Member schedule
   roster = [tankHealerDPSR]*30
   roster += [tankHealerDPSM]
   raid.cook(roster)
   assert raid.tanks == [tankHealerDPSR,tankHealerDPSR]
-  assert raid.healers == [tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR]
-  assert raid.DPS == [tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR]
+  assert raid.healers.sort(key=lambda p: p.name)== [tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR].sort(key=lambda p: p.name)
+  assert raid.dps.sort(key=lambda p: p.name)== [tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR].sort(key=lambda p: p.name)
   assert raid.comp == [2,6,22]
   ### PUG schedule
   roster = [tankHealerDPSR]*30
   roster += [tankHealerDPSP]
   raid.cook(roster)
   assert raid.tanks == [tankHealerDPSR,tankHealerDPSR]
-  assert raid.healers == [tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR]
-  assert raid.DPS == [tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR]
+  assert raid.healers.sort(key=lambda p: p.name)== [tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR].sort(key=lambda p: p.name)
+  assert raid.dps.sort(key=lambda p: p.name)== [tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR,tankHealerDPSR].sort(key=lambda p: p.name)
   assert raid.comp == [2,6,22]
 
   # Test for proper depth chart handling
