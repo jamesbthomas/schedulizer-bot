@@ -135,7 +135,7 @@ def test_cookRaid():
   raid.cook(roster)
   assert raid.tanks == [tankR,tankM]
   assert raid.healers == [healerR,healerS]
-  assert raid.dps == [DPSR,DPSR,DPSR,DPSR,DPSS,DPSS]
+  assert raid.dps == [DPSR,DPSR,DPSR,DPSR,DPSS,DPSM]
   assert raid.comp == [2,2,6]
   ### Select Raiders to tank and heal before other members
   roster = [tankR,tankDPSHealerS,healerR,healerDPSTankS,DPSR,DPSR,DPSR,DPSR,DPSHealerTankR,DPSTankHealerR]
