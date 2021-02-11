@@ -88,6 +88,9 @@ class Server(object):
         # Create the database file for this server's roster
         self.roster_db = pickledb.load(os.path.join(self.db_path,"roster.db"),False)
         self.roster_db.dump()
+        # Setup event tracking for this server
+        ## List of Event objects that will occur at some point in the future
+        self.events = []
 
 
 class SchedClient(commands.Bot):
