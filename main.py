@@ -16,6 +16,7 @@ sys.path.append(os.path.join(project_root,"classes"))
 
 # Import subpackages
 import server, player
+from event import *
 
 # Build the Intents object for the client
 intents = discord.Intents.default()
@@ -55,6 +56,7 @@ async def on_ready():
       server = client.servers[client.server_ids.index(guild.id)]
       server.getRoles(guild.roles)
       server.getRoster()
+      server.getEvents()
     try:
       print("\tRoles: RAIDER/"+server.Raider.name,"SOCIAL/"+server.Social.name,"MEMBER/"+server.Member.name,"PUG/"+server.PUG.name)
     except AttributeError:
@@ -79,7 +81,7 @@ async def show(context,opt: str):
   elif opt == "events":
     events = []
     for event in server.events:
-      events.append("Type: "+str(type(event))+"\tName: "+event.description+"\tDate: "+str(event.date))
+      events.append("Type: "+("raid" if isinstance(event,Raid) else "event" if isinstance(event,Event) else "ERROR")+"\tName: "+event.description+"\tDate: "+str(event.date))
     if len(events) > 0:
       await context.send("\n".join(events))
     else:
@@ -87,9 +89,8 @@ async def show(context,opt: str):
   else:
     await context.send_help(context.command)
 
-@client.command(name="event",help="Create/Modify/Delete Event objects.\n\tUsage: !event create <type> <name> <date:DDMMM[YYYY]> <time:HH:MM[AM|PM]> <recurring:True|False> [frequency:weekly|monthly]\n\t!event delete <all|one> <name> [<date> [<time>]]\n\t!event set <all|one> <name> <property> <value> [<date> [<time>]]")
-async def new(context, *args):
-#async def new(context,op: str,type = None,name = None: str,date = None: str,time: str, recurring: str, frequency = None):
+@client.command(name="event",help="Create/Modify/Delete Event objects. Usage:\n!event create <type> <name> <date:DDMMM[YYYY]> <time:HH:MM[AM|PM]> <recurring:True|False> [frequency:weekly|monthly]\n!event delete <all|one> <name> [<date> [<time>]]\n!event set <all|one> <name> <property> <value> [<date> [<time>]]")
+async def event(context, *args):
   ## Generate inputs based on number of args
   operation = args[0]
   if operation == "create":
@@ -122,8 +123,6 @@ async def new(context, *args):
       raise ValueError("Operation \'delete\' requires type input")
     elif name == None:
       raise ValueError("Operation \'delete\' requires name input")
-    elif date == None:
-      raise ValueError("Operation \'delete\' requires date input")
     elif date != None and time == None and type != "all":
       raise ValueError("Operation \'delete\' requires time input unless using type \'all\'")
       return
@@ -148,6 +147,8 @@ async def new(context, *args):
       raise ValueError("Operation \'set\' requires value input")
     elif type == "one" and (date == None or time == None):
       raise ValueError("Operation \'set\' with type \'one\' requires date and time input")
+  else:
+    raise ValueError("Unknown operation. Only accepts \'create\', \'set\', and \'delete\'")
 
   # Transform inputs into the types we need to construct the object
   ## type
@@ -165,7 +166,7 @@ async def new(context, *args):
   mons = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"]
   if (not isinstance(date,str) and date != None) or (not isinstance(time,str) and time != None):
     raise TypeError("Inputs \'date\' and \'time\' must be of type str")
-  else: #turn them into a datetime object
+  elif date != None: #turn them into a datetime object
     # First, check to make sure they conform to the format I want
     if not re.match("\d\d\w\w\w(\d\d\d\d)?",date):
       raise ValueError("Input \'date\' must be in the DDMMM or DDMMMYYY format, such as 01JAN or 01JAN1970")
@@ -200,7 +201,7 @@ async def new(context, *args):
       await context.send("WARNING: Event date is not in the current year")
     ### TIME
     if time != None:
-      if not re.match("\d\d:\d\d(AM|PM)?",time):
+      if not re.match("\d{1,2}:\d\d(AM|PM)?",time):
         raise ValueError("Input \'time\' must be in the HH:MM format using 12- or 24-hour clocks, such as 10:00PM or 22:00")
       else: # Check to make sure the format is good, ie 22:00 PM is wrong
         hour, remainder = time.split(":")
@@ -228,11 +229,12 @@ async def new(context, *args):
             raise ValueError("Input \'time\' in 24-hour mode can only have hours bettween 0-24")
       ### make the object
       d = datetime.datetime(year,mons.index(mon)+1,day,hour,min)
-    d = datetime.datetime(year,mons.index(mon)+1,day)
+    else:
+      d = datetime.datetime(year,mons.index(mon)+1,day)
   if operation == "create":
     ## recurring
     if recurring.lower() == "true":
-        rec = True
+      rec = True
     elif recurring.lower() == "false":
       rec = False
     else:
@@ -244,7 +246,29 @@ async def new(context, *args):
       raise ValueError("Input \'recurring\' must have a value for input \'frequency\'")
     elif frequency.lower() != "weekly" and frequency.lower() != "monthly":
       raise ValueError("Input \'frequency\' must be either \'weekly\' or \'monthly\'")
-  await context.send(str(d))
+  ## Done validating inputs, create the event object and store it in the server
+  server = client.servers[client.server_ids.index(context.guild.id)]
+  ### CREATE
+  if operation == "create":
+    if type == 'event':
+      if not frequency:
+        e = Event(d,rec,name)
+      else:
+        e = Event(d,rec,name,frequency)
+    elif type == 'raid':
+      e = Raid(d,rec,name,frequency)
+    result = server.addEvent(e)
+    message = ""
+    if result:
+      message = "Successfully added event {0}".format(e.description)
+    else:
+      message = "WARNING: Unable to add event"
+  elif operation == "delete":
+    server.deleteEvent(name,type,date,time)
+    message = "Successfully deleted {0} instance(s) of event {1}".format(type,name)
+  elif operation == "set":
+    message = "STUB set"
+  await context.send(message)
 
 @client.event
 async def on_command_error(context,error):
@@ -254,7 +278,7 @@ async def on_command_error(context,error):
     await context.send_help(context.command)
   else:
     await context.send(":".join(str(error).split(":")[1:]))
-    await context.send_help()
+    await context.send_help(context.command)
 
 # Call the client run method of the previously created discord client, using the value of the TOKEN key in the current directory's environment file, .env
 load_dotenv()

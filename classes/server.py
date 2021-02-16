@@ -1,10 +1,69 @@
 # Defines the Server class and extends the Discord.Client class to track it
 
-import discord, pickledb, os, player
+import discord, pickledb, os, player, event, datetime
 from discord.ext import commands
 
 class Server(object):
     # Class for tracking properties by server
+
+    def addEvent(self,e):
+      ## do some light error checking
+      if isinstance(e,event.Raid):
+        t = "raid"
+      elif isinstance(e,event.Event):
+        t = "event"
+      else:
+        raise TypeError("Input must be a propertly constructed Event or Raid object")
+      ## make sure we dont already have an event with this name
+      if e in self.events:
+        raise ValueError("Event exists")
+      ## Adds an event object to this instance and the database
+      index = len(self.events)
+      self.events.insert(index,e)
+      # Turn the event into a list for storage in the DB
+      eList = [t,str(e.date),e.description,e.recurring,e.frequency]
+      self.events_db.set(str(index),eList)
+      self.events_db.dump()
+      return True
+
+    def deleteEvent(self,name,type = None,date = None, time = None):
+      ## get the number of events the name corresponds to
+      es = list(filter(lambda e: e.description == name,self.events))
+      numEvents = len(es)
+      if numEvents < 1:
+        raise ValueError("Unknown Event")
+      ## Make sure inputs make sense
+      if type == "one" and (date == None or time == None):
+        if numEvents > 1:
+          raise ValueError("Operation type \'one\' must have a unique name OR inputs for \'date\' and \'time\'")
+      ## find the item(s) to delete
+      if date != None:
+        es = list(filter(lambda e: e.date.strftime("%d%b%Y").upper() == date,es))
+        if time != None:
+          es = list(filter(lambda e: e.date.strftime("%H:%M") == time,es))
+      ### from the database
+      for e in es:
+        i = self.events.index(e)
+        self.events_db.rem(str(i))
+      self.events_db.dump()
+      ### from the list
+      self.events = list(filter(lambda e: e not in es,self.events))
+
+      ## TODO - need better keys for the event db
+
+    def getEvents(self):
+      self.events_db = pickledb.load(os.path.join(self.db_path,"events.db"),False)
+      events = self.events_db.getall()
+      for i in events:
+        dbevent = self.events_db.get(i)
+        if dbevent[0] == "raid":
+          e = event.Raid(datetime.datetime.fromisoformat(dbevent[1]),dbevent[3],dbevent[2],dbevent[4])
+        elif dbevent[0] == "event":
+          e = event.Event(datetime.datetime.fromisoformat(dbevent[1]),dbevent[3],dbevent[2],dbevent[4])
+        else:
+          continue
+        self.events.insert(int(i),e)
+      return
     
     def getRoles(self,roles):
       self.db = pickledb.load(os.path.join(self.db_path,"server.db"), False)
@@ -90,7 +149,11 @@ class Server(object):
         self.roster_db.dump()
         # Setup event tracking for this server
         ## List of Event objects that will occur at some point in the future
+        ### List includes instances of recurring events, not the recurring events themselves
         self.events = []
+        ## create the database for this server's events
+        self.events_db = pickledb.load(os.path.join(self.db_path,"events.db"),False)
+        self.events_db.dump()
 
 
 class SchedClient(commands.Bot):
