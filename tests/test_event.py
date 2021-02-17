@@ -19,29 +19,30 @@ def test_makeEvent():
   # Test expected use
   ## Datetime constructor: year, month, day, hour, minute, second
   d = datetime.datetime(1970,1,1,0,0,0)
-  recurring = event.Event(d,True,"recurring event","weekly")
-  once = event.Event(d,False,"event that occurs once")
+  recurring = event.Event(d,"recurring event",True,"weekly")
+  once = event.Event(d,"event that occurs once",False)
 
   assert recurring.date == d
   assert recurring.recurring == True
-  assert recurring.description == "recurring event"
+  assert recurring.name == "recurring event"
   assert recurring.frequency == "weekly"
   assert once.date == d
   assert once.recurring == False
-  assert once.description == "event that occurs once"
+  assert once.name == "event that occurs once"
   assert once.frequency == None
   # Test bad datatypes
   ## bad date
   with pytest.raises(TypeError):
-    badDate = event.Event("1970-01-01 00:00:00",True,"has a bad date")
+    badDate = event.Event("1970-01-01 00:00:00","has a bad date",True)
   ## bad recurring
   with pytest.raises(TypeError):
-    badRecurring = event.Event(d,"true","has bad recurring")
-  ## bad description
+    badRecurring = event.Event(d,"has bad recurring","true")
+  ## bad name
   with pytest.raises(TypeError):
-    badDescription = event.Event(d,True,123)
+    badName = event.Event(d,123,True)
+  ## bad freq
   with pytest.raises(TypeError):
-    badFreq = event.Event(d,True,"123",123)
+    badFreq = event.Event(d,"123",True,123)
 
 def test_makeRaid():
   """
@@ -51,18 +52,18 @@ def test_makeRaid():
   """
 
   d = datetime.datetime(1970,1,1,0,0,0)
-  recurring = event.Raid(d,True,"recurring raid","weekly")
-  once = event.Raid(d,False,"raid occurs once")
+  recurring = event.Raid(d,"recurring raid",True,"weekly")
+  once = event.Raid(d,"raid occurs once",False)
   comps = [[2,2,6],[2,3,10],[2,4,14],[2,5,18],[2,6,22]]
 
   assert recurring.date == d
   assert recurring.recurring == True
-  assert recurring.description == "recurring raid"
+  assert recurring.name == "recurring raid"
   assert recurring.frequency == "weekly"
   assert recurring.comps == comps
   assert once.date == d
   assert once.recurring == False
-  assert once.description == "raid occurs once"
+  assert once.name == "raid occurs once"
   assert once.comps == comps
 
 def test_cookRaid():
@@ -114,7 +115,7 @@ def test_cookRaid():
   DPSP = player.Player("DPSP","PUG",["DPS"])
 
   # Create the Raid event
-  raid = event.Raid(datetime.datetime(1970,1,1,0,0,0),False,"Raid.cook() Test")
+  raid = event.Raid(datetime.datetime(1970,1,1,0,0,0),"Raid.cook() Test",False)
 
   # Tests for input types
   with pytest.raises(TypeError,match=re.escape("\'roster\' must be of type *list[Player]")):

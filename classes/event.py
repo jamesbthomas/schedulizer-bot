@@ -7,7 +7,7 @@ import player
 
 class Event(object):
 
-  def __init__(self,date: datetime.datetime,recurring: bool,description: str,frequency: str = None):
+  def __init__(self,date: datetime.datetime,name: str,recurring: bool,frequency: str = None):
     if isinstance(date,datetime.datetime):
       self.date = date
     else:
@@ -24,10 +24,10 @@ class Event(object):
         self.frequency = None
     else:
       raise TypeError("\'recurring\' must be of type bool")
-    if isinstance(description,str):
-      self.description = description
+    if isinstance(name,str):
+      self.name = name
     else:
-      raise TypeError("\'description\' must be of type str")
+      raise TypeError("\'name\' must be of type str")
 
 class Raid(Event):
   # Used to signifiy a raid (for auto-cooking the roster)
@@ -181,7 +181,7 @@ class Raid(Event):
     #print("DPS - ",list(map(lambda p: p.name,self.dps)))
     #print("BREAKBREAKBREAK")
 
-  def __init__(self,date: datetime,recurring: bool,description: str,frequency: str = None):
-    super().__init__(date,recurring,description,frequency)
+  def __init__(self,date: datetime,name: str,recurring: bool,frequency: str = None):
+    super().__init__(date,name,recurring,frequency)
     self.comps = [[2,2,6],[2,3,10],[2,4,14],[2,5,18],[2,6,22]]
     return

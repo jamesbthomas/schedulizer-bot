@@ -1,6 +1,6 @@
 # Defines the Server class and extends the Discord.Client class to track it
 
-import discord, pickledb, os, player, event, datetime
+import discord, pickledb, os, player, event, datetime, hashlib
 from discord.ext import commands
 
 class Server(object):
@@ -14,21 +14,31 @@ class Server(object):
         t = "event"
       else:
         raise TypeError("Input must be a propertly constructed Event or Raid object")
-      ## make sure we dont already have an event with this name
+      ## make sure we dont already have this event
       if e in self.events:
         raise ValueError("Event exists")
-      ## Adds an event object to this instance and the database
-      index = len(self.events)
-      self.events.insert(index,e)
       # Turn the event into a list for storage in the DB
-      eList = [t,str(e.date),e.description,e.recurring,e.frequency]
-      self.events_db.set(str(index),eList)
+      eList = [t,str(e.date),e.name,e.recurring,e.frequency]
+      ## make sure we dont already have a recurring event with this name
+      if e.name in self.events_db.getall() and e.recurring:
+        raise ValueError("Recurring event with this name exists; mark event as not recurring or select a unique name")
+      # add event to list of events
+      self.events.append(e)
+      # generate a unique identifier
+      ## repeating events dont get an identifier
+      if e.recurring:
+        id = e.name
+      ## one-time events are identified by the unique hash of the event name and date
+      else:
+        id_str = "{0}{1}".format(e.name,str(e.date))
+        id = hashlib.md5(id_str.encode("utf-8")).hexdigest()
+      self.events_db.set(id,eList)
       self.events_db.dump()
       return True
 
     def deleteEvent(self,name,type = None,date = None, time = None):
       ## get the number of events the name corresponds to
-      es = list(filter(lambda e: e.description == name,self.events))
+      es = list(filter(lambda e: e.name == name,self.events))
       numEvents = len(es)
       if numEvents < 1:
         raise ValueError("Unknown Event")
@@ -43,26 +53,28 @@ class Server(object):
           es = list(filter(lambda e: e.date.strftime("%H:%M") == time,es))
       ### from the database
       for e in es:
-        i = self.events.index(e)
-        self.events_db.rem(str(i))
+        if e.recurring:
+          id = e.name
+        else:
+          id_str = "{0}{1}".format(e.name,str(e.date))
+          id = hashlib.md5(id_str.encode("utf-8")).hexdigest()
+        self.events_db.rem(id)
       self.events_db.dump()
       ### from the list
       self.events = list(filter(lambda e: e not in es,self.events))
 
-      ## TODO - need better keys for the event db
-
     def getEvents(self):
       self.events_db = pickledb.load(os.path.join(self.db_path,"events.db"),False)
-      events = self.events_db.getall()
-      for i in events:
-        dbevent = self.events_db.get(i)
+      keys = self.events_db.getall()
+      for k in keys:
+        dbevent = self.events_db.get(k)
         if dbevent[0] == "raid":
-          e = event.Raid(datetime.datetime.fromisoformat(dbevent[1]),dbevent[3],dbevent[2],dbevent[4])
+          e = event.Raid(datetime.datetime.fromisoformat(dbevent[1]),dbevent[2],dbevent[3],dbevent[4])
         elif dbevent[0] == "event":
-          e = event.Event(datetime.datetime.fromisoformat(dbevent[1]),dbevent[3],dbevent[2],dbevent[4])
+          e = event.Event(datetime.datetime.fromisoformat(dbevent[1]),dbevent[2],dbevent[3],dbevent[4])
         else:
           continue
-        self.events.insert(int(i),e)
+        self.events.append(e)
       return
     
     def getRoles(self,roles):
@@ -83,7 +95,6 @@ class Server(object):
       return
 
     def mapRole(self,role,sched):
-      ## TODO - handle this more gracefully
       if role == None:
         return
       elif sched == "Raider":

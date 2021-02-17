@@ -1,6 +1,6 @@
 # Test-Driven Development for the Server class
 
-import pytest, sys, os, pickledb, datetime
+import pytest, sys, os, pickledb, datetime, hashlib
 project_root = os.path.split(os.path.dirname(__file__))[0]
 print(project_root)
 sys.path.append(os.path.join(project_root,"classes"))
@@ -470,63 +470,87 @@ def test_addEvent():
   )
   # build the event objects for this test
   d = datetime.datetime.now()
-  rec = event.Event(d,True,"recurring event","weekly")
-  once = event.Event(d,False,"occurs once")
-  raid = event.Raid(d,True,"recurring raid","monthly")
+  rec = event.Event(d,"recurring event",True,"weekly")
+  rec1 = event.Event(d+datetime.timedelta(0,60),"recurring event",True,"weekly")
+  once = event.Event(d,"occurs once",False)
+  once_str = "{0}{1}".format(once.name,str(once.date))
+  once_id = hashlib.md5(once_str.encode("utf-8")).hexdigest()
+  raid = event.Raid(d,"recurring raid",True,"monthly")
 
   try:
     # run Tests
     ## add first event
     s.addEvent(rec)
     assert s.events[0] == rec
-    rec_db = s.events_db.get('0')
+    rec_db = s.events_db.get(rec.name)
+    assert rec_db
     assert rec_db[0] == "event"
     assert s.events[0].date == datetime.datetime.fromisoformat(rec_db[1])
-    assert s.events[0].description == rec_db[2]
+    assert s.events[0].name == rec_db[2]
     assert s.events[0].recurring == rec_db[3]
     assert s.events[0].frequency == rec_db[4]
     ## add second event
     s.addEvent(once)
     assert s.events[0] == rec
-    rec_db = s.events_db.get('0')
+    rec_db = s.events_db.get(rec.name)
+    assert rec_db
     assert rec_db[0] == "event"
     assert s.events[0].date == datetime.datetime.fromisoformat(rec_db[1])
-    assert s.events[0].description == rec_db[2]
+    assert s.events[0].name == rec_db[2]
     assert s.events[0].recurring == rec_db[3]
     assert s.events[0].frequency == rec_db[4]
     assert s.events[1] == once
-    once_db = s.events_db.get('1')
+    once_db = s.events_db.get(once_id)
+    assert once_db
     assert once_db[0] == "event"
     assert s.events[1].date == datetime.datetime.fromisoformat(once_db[1])
-    assert s.events[1].description == once_db[2]
+    assert s.events[1].name == once_db[2]
     assert s.events[1].recurring == once_db[3]
     assert s.events[1].frequency == once_db[4]
     ## add third event
     s.addEvent(raid)
     assert s.events[0] == rec
-    rec_db = s.events_db.get('0')
+    rec_db = s.events_db.get(rec.name)
+    assert rec_db
     assert rec_db[0] == "event"
     assert s.events[0].date == datetime.datetime.fromisoformat(rec_db[1])
-    assert s.events[0].description == rec_db[2]
+    assert s.events[0].name == rec_db[2]
     assert s.events[0].recurring == rec_db[3]
     assert s.events[0].frequency == rec_db[4]
     assert s.events[1] == once
-    once_db = s.events_db.get('1')
+    once_db = s.events_db.get(once_id)
+    assert once_db
     assert once_db[0] == "event"
     assert s.events[1].date == datetime.datetime.fromisoformat(once_db[1])
-    assert s.events[1].description == once_db[2]
+    assert s.events[1].name == once_db[2]
     assert s.events[1].recurring == once_db[3]
     assert s.events[1].frequency == once_db[4]
     assert s.events[2] == raid
-    raid_db = s.events_db.get('2')
+    raid_db = s.events_db.get(raid.name)
+    assert raid_db
     assert raid_db[0] == "raid"
     assert s.events[2].date == datetime.datetime.fromisoformat(raid_db[1])
-    assert s.events[2].description == raid_db[2]
+    assert s.events[2].name == raid_db[2]
     assert s.events[2].recurring == raid_db[3]
     assert s.events[2].frequency == raid_db[4]
     ## Throw error of event with that name FileExistsError
     with pytest.raises(ValueError,match="Event exists"):
       s.addEvent(raid)
+    ## throw error if we try to add a recurring event with the same name
+    with pytest.raises(ValueError,match="Recurring event with this name exists; mark event as not recurring or select a unique name"):
+      s.addEvent(rec1)
+    ## but allow it if its the same name but not recurring
+    one_raid = event.Raid(d,"recurring raid",False)
+    one_raid_str = "{0}{1}".format(one_raid.name,str(one_raid.date))
+    one_raid_id = hashlib.md5(one_raid_str.encode("utf-8")).hexdigest()
+    s.addEvent(one_raid)
+    assert one_raid in s.events
+    one_raid_db = s.events_db.get(one_raid_id)
+    assert one_raid_db[0] == "raid"
+    assert datetime.datetime.fromisoformat(one_raid_db[1]) == one_raid.date
+    assert one_raid_db[2] == one_raid.name
+    assert one_raid_db[3] == one_raid.recurring
+    assert one_raid_db[4] == one_raid.frequency
 
   finally:
     # clear out DBs
@@ -555,7 +579,7 @@ def test_getEvents():
   )
   # create an event
   d = datetime.datetime.now()
-  e = event.Event(d,True,"test event","weekly")
+  e = event.Event(d,"test event",True,"weekly")
   # add event to the server
   s.addEvent(e)
   # recreate the client
@@ -569,7 +593,7 @@ def test_getEvents():
     newS.getEvents()
     assert len(newS.events) == 1
     assert newS.events[0].date == e.date
-    assert newS.events[0].description == e.description
+    assert newS.events[0].name == e.name
     assert newS.events[0].recurring == e.recurring
     assert newS.events[0].frequency == e.frequency
   finally:
@@ -600,37 +624,47 @@ def test_deleteEvent():
   )
   # create an event
   d = datetime.datetime.now()
-  rec = event.Event(d,True,"test event","weekly")
-  rec1 = event.Event(d+datetime.timedelta(0,60),True,"test event","weekly")
-  one = event.Raid(d,False,"second event")
+  rec = event.Event(d,"test event",True,"weekly")
+  rec1 = event.Event(d+datetime.timedelta(0,60),"test event",True,"weekly")
+  rec2 = event.Event(d+datetime.timedelta(0,60),"test event",False)
+  one = event.Raid(d,"second event",False)
 
   try:
     s.addEvent(rec)
     ## Delete only event
-    s.deleteEvent(rec.description)
+    s.deleteEvent(rec.name)
     assert s.events == []
     assert len(s.events_db.getall()) == 0
     ## Delete one of multiple events
+    ### a recurring event
     s.addEvent(rec)
     s.addEvent(one)
-    s.deleteEvent(rec.description)
+    s.deleteEvent(rec.name)
     assert s.events == [one]
     assert len(s.events_db.getall()) == 1
+    ### a one-time event
+    s.addEvent(rec)
+    s.deleteEvent(one.name)
+    assert s.events == [rec]
+    assert len(s.events_db.getall()) == 1
     ## delete unknown event
+    s.deleteEvent(rec.name)
     with pytest.raises(ValueError,match="Unknown Event"):
-      s.deleteEvent(rec.description)
+      s.deleteEvent(rec.name)
     ## delete non-unique event without date/time
     s.addEvent(rec)
-    s.addEvent(rec1)
+    s.addEvent(rec2)
     with pytest.raises(ValueError,match="Operation type \'one\' must have a unique name OR inputs for \'date\' and \'time\'"):
-      s.deleteEvent(rec.description,"one")
+      s.deleteEvent(rec.name,"one")
     ## delete unique event when multiple exist
-    s.deleteEvent(rec1.description,"one",d.strftime("%d%b%Y").upper(),(d+datetime.timedelta(0,60)).strftime("%H:%M"))
+    s.deleteEvent(rec1.name,"one",d.strftime("%d%b%Y").upper(),(d+datetime.timedelta(0,60)).strftime("%H:%M"))
     assert rec1 not in s.events
     assert rec in s.events
     ## delete all events
-    s.addEvent(rec1)
-    s.deleteEvent(rec.description,all)
+    s.addEvent(rec2)
+    print(list(map(lambda x: [x.name,str(x.date)],s.events)))
+    print(s.events_db.getall())
+    s.deleteEvent(rec.name,"all")
     assert rec1 not in s.events
     assert rec not in s.events
 
