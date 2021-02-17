@@ -675,3 +675,168 @@ def test_deleteEvent():
     os.rmdir(os.path.join(project_root,"databases","deleteEvent.db"))
     client.servers.pop(client.server_ids.index("deleteEvent"))
     client.server_ids.pop(client.server_ids.index("deleteEvent"))
+
+def test_setEvent():
+  """
+  GIVEN SchedClient object with at least one correctly formatted event and specified property and value to change
+  WHEN the method is called
+  THEN update the local and DB copies of the event as appropriate with the specified settings
+  """
+
+  # Create the client
+  client = None
+  client = server.SchedClient(command_prefix='!')
+  client.setup()
+  s = client.addServer(
+    id = "setEvent",
+    name = "Server for setEvent test",
+    owner = "TestOwner"
+  )
+  # create an event
+  d = datetime.datetime.now()
+  d_date = d +datetime.timedelta(1)
+  d_time = d_date+datetime.timedelta(0,60)
+  d2 = d + datetime.timedelta(2,120)
+  d2_date = d2 + datetime.timedelta(1)
+  d2_time = d2_date + datetime.timedelta(0,60)
+  e1 = event.Event(d,"test event",True,"weekly")
+  e2 = event.Event(d,"test event2",False)
+  e3 = event.Event(d2,"test event2",False)
+
+  # add event to the server
+  s.addEvent(e1)
+  s.addEvent(e2)
+  e1index = s.events.index(list(filter((lambda x: x.name == e1.name),s.events))[0])
+  e2index = s.events.index(list(filter((lambda x: x.name == e2.name),s.events))[0])
+
+  try:
+    # change one event
+    ## Change the date of the event
+    s.setEvent("one",e1.name,"date",d_date.date(),d)
+    assert s.events[e1index].name == e1.name
+    assert s.events[e1index].date == d_date
+    assert s.events[e1index].recurring == e1.recurring
+    assert s.events[e1index].frequency == e1.frequency
+    ## Change the time of the event
+    s.setEvent("one",e1.name,"time",d_time.time(),d_date)
+    assert s.events[e1index].name == e1.name
+    assert s.events[e1index].date == d_time
+    assert s.events[e1index].recurring == e1.recurring
+    assert s.events[e1index].frequency == e1.frequency
+    ## change the name of the event
+    s.setEvent("one",e1.name,"name","changed test event",d_time)
+    assert s.events[e1index].name == "changed test event"
+    assert s.events[e1index].date == d_time
+    assert s.events[e1index].recurring == e1.recurring
+    assert s.events[e1index].frequency == e1.frequency
+    ## change the frequency of the event
+    s.setEvent("one","changed test event","frequency","monthly",d_time)
+    assert s.events[e1index].name == "changed test event"
+    assert s.events[e1index].date == d_time
+    assert s.events[e1index].recurring == e1.recurring
+    assert s.events[e1index].frequency == e1.frequency
+    ## change the recurring status of the event
+    s.setEvent("one","changed test event","recurring",False,d_time)
+    assert s.events[e1index].name == "changed test event"
+    assert s.events[e1index].date == d_time
+    assert s.events[e1index].recurring == False
+    assert s.events[e1index].frequency == None
+    ## other events didnt change
+    assert s.events[e2index].name == e2.name
+    assert s.events[e2index].date == e2.date
+    assert s.events[e2index].recurring == e2.recurring
+    assert s.events[e2index].frequency == e2.frequency
+    ## throw errors
+    ### tried to change frequency but event is not recurring
+    with pytest.raises(ValueError,match="Cannot change frequency for one-time event"):
+      s.setEvent("one","changed test event","frequency","weekly",d_time)
+    ### date and time not provided
+    s.addEvent(e3)
+    with pytest.raises(ValueError,match="Operation type \'one\' must have a unique name OR inputs for \'date\' and \'time\'"):
+      s.setEvent("one","test event2","recurring",True)
+    # change all events
+    e3index = s.events.index(list(filter((lambda x: x.name == e3.name and x.date == e3.date),s.events))[0])
+    ## Change the date of the events
+    s.setEvent("all",e2.name,"date",d2_date.date())
+    assert s.events[e2index].name == e2.name
+    assert s.events[e2index].date == d2_date-datetime.timedelta(0,120)
+    assert s.events[e2index].recurring == e2.recurring
+    assert s.events[e2index].frequency == e2.frequency
+    assert s.events[e3index].name == e3.name
+    assert s.events[e3index].date == d2_date
+    assert s.events[e3index].recurring == e3.recurring
+    assert s.events[e3index].frequency == e3.frequency
+    ## reset for next battery
+    s.setEvent("one",e2.name,"date",d,s.events[e2index].date)
+    ## Change the time of the events
+    s.setEvent("all",e2.name,"time",d2_time.time())
+    assert s.events[e2index].name == e2.name
+    assert s.events[e2index].date == d2_time-datetime.timedelta(3,0)
+    assert s.events[e2index].recurring == e2.recurring
+    assert s.events[e2index].frequency == e2.frequency
+    assert s.events[e3index].name == e3.name
+    assert s.events[e3index].date == d2_time
+    assert s.events[e3index].recurring == e3.recurring
+    assert s.events[e3index].frequency == e3.frequency
+    ## change the name of the events
+    s.setEvent("all",e2.name,"name","changed "+e2.name)
+    assert s.events[e2index].name == "changed test event2"
+    assert s.events[e2index].date == d2_time-datetime.timedelta(3)
+    assert s.events[e2index].recurring == e2.recurring
+    assert s.events[e2index].frequency == e2.frequency
+    assert s.events[e3index].name == "changed test event2"
+    assert s.events[e3index].date == d2_time
+    assert s.events[e3index].recurring == e3.recurring
+    assert s.events[e3index].frequency == e3.frequency
+
+    ## other event didnt change
+    assert s.events[e1index].name == "changed test event"
+    assert s.events[e1index].date == d_time
+    assert s.events[e1index].recurring == False
+    assert s.events[e1index].frequency == None
+    ## throw errors
+    ### cannot change recurring of all events
+    with pytest.raises(ValueError,match="Operation \'all\' cannot be used to change event \'recurring\' status"):
+      s.setEvent("all","changed test event2","recurring",True)
+    ### cannot change frequency of all events
+    with pytest.raises(ValueError,match="Operation \'all\' cannot be used to change event frequency"):
+      s.setEvent("all","changed test event2","frequency","weekly")
+    # event does not exist
+    ## by name
+    with pytest.raises(ValueError,match="Unknown Event"):
+      s.setEvent("one","bad name","date",d_date.date(),d)
+    ## by time
+    with pytest.raises(ValueError,match="Matching event found with incorrect inputs \'date\' or \'time\'"):
+      s.setEvent("one",e1.name,"date",d_date.date(),d-datetime.timedelta(4))
+
+    ## Last up, check the events in the database
+    e1_id = hashlib.md5("{0}{1}".format(e1.name,str(e1.date)).encode("utf-8")).hexdigest()
+    e2_id = hashlib.md5("{0}{1}".format(e2.name,str(e2.date)).encode("utf-8")).hexdigest()
+    e3_id = hashlib.md5("{0}{1}".format(e3.name,str(e3.date)).encode("utf-8")).hexdigest()
+    e1db = s.events_db.get(e1_id)
+    assert e1db
+    e2db = s.events_db.get(e2_id)
+    assert e2db
+    e3db = s.events_db.get(e3_id)
+    assert e3db
+    assert len(s.events_db.getall()) == 3
+    assert e1db[1] == str(e1.date)
+    assert e1db[2] == e1.name
+    assert e1db[3] == e1.recurring
+    assert e1db[4] == e1.frequency
+    assert e2db[1] == str(e2.date)
+    assert e2db[2] == e2.name
+    assert e2db[3] == e2.recurring
+    assert e2db[4] == e2.frequency
+    assert e3db[1] == str(d2_time)
+    assert e3db[2] == e3.name
+    assert e3db[3] == e3.recurring
+    assert e3db[4] == e3.frequency
+
+  finally:
+    os.remove(os.path.join(project_root,"databases","setEvent.db","server.db"))
+    os.remove(os.path.join(project_root,"databases","setEvent.db","roster.db"))
+    os.remove(os.path.join(project_root,"databases","setEvent.db","events.db"))
+    os.rmdir(os.path.join(project_root,"databases","setEvent.db"))
+    client.servers.pop(client.server_ids.index("setEvent"))
+    client.server_ids.pop(client.server_ids.index("setEvent"))

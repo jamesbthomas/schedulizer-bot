@@ -63,6 +63,65 @@ class Server(object):
       ### from the list
       self.events = list(filter(lambda e: e not in es,self.events))
 
+    def setEvent(self,type,name,prop,val,d = None):
+      ## get total number of events to change
+      es = list(filter(lambda e: e.name == name,self.events))
+      numEvents = len(es)
+      if numEvents < 1:
+        raise ValueError("Unknown Event")
+      ## type checking
+      if type == "one" and (d == None):
+        if numEvents > 1:
+          raise ValueError("Operation type \'one\' must have a unique name OR inputs for \'date\' and \'time\'")
+      elif type == "one":
+        es = list(filter(lambda e: e.date == d,es))
+        numEvents = len(es)
+        if numEvents < 1:
+          raise ValueError("Matching event found with incorrect inputs \'date\' or \'time\'")
+      elif type == "all":
+        if prop == "recurring":
+          raise ValueError("Operation \'all\' cannot be used to change event \'recurring\' status")
+        elif prop == "frequency":
+          raise ValueError("Operation \'all\' cannot be used to change event frequency")
+      ## iterate through list of events to change (es)
+      for e in es:
+        ## pull out the event we're modifying
+        index = self.events.index(e)
+        if e.recurring:
+          id = e.name
+        else:
+          id_str = "{0}{1}".format(e.name,str(e.date))
+          id = hashlib.md5(id_str.encode("utf-8")).hexdigest()
+        e_db = self.events_db.get(id)
+        ## modify event based on the value of prop
+        if prop == "date":
+          e.date = e.date.replace(year=val.year,month=val.month,day=val.day)
+        elif prop == "time":
+          e.date = e.date.replace(hour=val.hour,minute=val.minute)
+        elif prop == "name":
+          e.name = val
+        elif prop == "recurring":
+          e.recurring = val
+          if not e.recurring:
+            e.frequency = None
+        elif prop == "frequency":
+          if not e.recurring:
+            raise ValueError("Cannot change frequency for one-time event")
+          e.frequency = val
+        else:
+          raise ValueError("Unknown property")
+        self.events_db.rem(id)
+        ## build the list for storing in the database
+        eList = [e_db[0],str(e.date),e.name,e.recurring,e.frequency]
+        ## rebuild the id for the event
+        if e.recurring:
+          id = e.name
+        else:
+          id_str = "{0}{1}".format(e.name,str(e.date))
+          id = hashlib.md5(id_str.encode("utf-8")).hexdigest()
+        # add the event to the database
+        self.events_db.set(id,eList)
+
     def getEvents(self):
       self.events_db = pickledb.load(os.path.join(self.db_path,"events.db"),False)
       keys = self.events_db.getall()
