@@ -81,7 +81,7 @@ async def show(context,opt: str):
   elif opt == "events":
     events = []
     for event in server.events:
-      events.append("Type: "+("raid" if isinstance(event,Raid) else "event" if isinstance(event,Event) else "ERROR")+"\tName: "+event.description+"\tDate: "+str(event.date))
+      events.append("Type: "+("raid" if isinstance(event,Raid) else "event" if isinstance(event,Event) else "ERROR")+"\tName: "+event.name+"\tDate: "+str(event.date))
     if len(events) > 0:
       await context.send("\n".join(events))
     else:
@@ -252,22 +252,30 @@ async def event(context, *args):
   if operation == "create":
     if type == 'event':
       if not frequency:
-        e = Event(d,rec,name)
+        e = Event(d,name,rec)
       else:
-        e = Event(d,rec,name,frequency)
+        e = Event(d,name,rec,frequency)
     elif type == 'raid':
-      e = Raid(d,rec,name,frequency)
+      e = Raid(d,name,rec,frequency)
     result = server.addEvent(e)
     message = ""
     if result:
-      message = "Successfully added event {0}".format(e.description)
+      message = "Successfully added event {0}".format(e.name)
     else:
       message = "WARNING: Unable to add event"
   elif operation == "delete":
     server.deleteEvent(name,type,date,time)
     message = "Successfully deleted {0} instance(s) of event {1}".format(type,name)
   elif operation == "set":
-    message = "STUB set"
+    if property == "date":
+      value = datetime.datetime.strptime(value,"%d%b%Y")
+    elif property == "time":
+      value = datetime.datetime.strptime(value,"%H:%M")
+    if d:
+      server.setEvent(type,name,property,value,d)
+    else:
+      server.setEvent(type,name,property,value)
+    message = "Successfully changed property {0} of event {1} to {2}".format(property,name,value)
   await context.send(message)
 
 @client.event
