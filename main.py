@@ -278,6 +278,43 @@ async def event(context, *args):
     message = "Successfully changed property {0} of event {1} to {2}".format(property,name,value)
   await context.send(message)
 
+@client.command(name="player",help="Manipulate Player objects.\nUsage:\n!player set <name> <property> <val>\n!player show <name> [<property>]")
+async def player(context, *args):
+  operation, name, property, value = [None]*4
+  try:
+    operation = args[0]
+    name = args[1]
+    property = args[2]
+    value = args[3]
+  except IndexError:
+    None
+  
+  # Check the operation is approved
+  if operation == "set":
+    if property == None:
+      raise ValueError("Operation \'set\' requires input \'property\'")
+    elif value == None:
+      raise ValueError("Operation \'set\' requires input \'value\'")
+  elif operation == "show":
+    ## Pass, show just needs a name
+    None
+  else:
+    raise ValueError("Unknown operation")
+  # check we got a name
+  if name == None:
+    raise ValueError("Input \'name\' required")
+  # locate the player object
+  server = client.servers[client.server_ids.index(context.guild.id)]
+  player = next(filter(lambda p: p.name == name,server.roster))
+  if player == None:
+    raise ValueError("Unknown Player")
+  # make sure the player object has a property associated with the input
+  if not hasattr(player,property):
+    raise ValueError("Unknown property")
+
+  await context.send("STUB operation: {0};name: {1};property:{2};value:{3} ".format(operation,name,property,value))
+
+
 @client.event
 async def on_command_error(context,error):
   if isinstance(error,discord.ext.commands.errors.CheckFailure):
