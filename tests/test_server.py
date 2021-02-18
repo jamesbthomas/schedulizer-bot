@@ -1,6 +1,6 @@
 # Test-Driven Development for the Server class
 
-import pytest, sys, os, pickledb
+import pytest, sys, os, pickledb, datetime, hashlib
 project_root = os.path.split(os.path.dirname(__file__))[0]
 print(project_root)
 sys.path.append(os.path.join(project_root,"classes"))
@@ -8,6 +8,7 @@ sys.path.append(os.path.join(project_root,"classes"))
 # Import modules for testing
 import server
 import player
+import event
 
 def test_SchedClient():
   """
@@ -99,6 +100,8 @@ def test_addServer():
       os.remove(os.path.join(project_root,"databases","test1.db",'server.db'))
       os.remove(os.path.join(project_root,"databases","test2.db",'roster.db'))
       os.remove(os.path.join(project_root,"databases","test1.db",'roster.db'))
+      os.remove(os.path.join(project_root,"databases","test2.db",'events.db'))
+      os.remove(os.path.join(project_root,"databases","test1.db",'events.db'))
       os.rmdir(os.path.join(project_root,"databases","test1.db"))
       os.rmdir(os.path.join(project_root,"databases","test2.db"))
       client.servers.pop(client.server_ids.index("test1"))
@@ -117,7 +120,7 @@ def test_mapRoles():
   client = server.SchedClient(command_prefix='!')
 
   # Add Test Server
-  client.addServer(
+  s = client.addServer(
     id = "rolesTest",
     name = "Server for mapRoles test",
     owner = "TestOwner"
@@ -132,34 +135,35 @@ def test_mapRoles():
       self.mention = mention
       self.id = id
 
-  testRaider = Role("testRaider",client.servers[0].name,"@testRaider",1111)
-  testSocial = Role("testSocial",client.servers[0].name,"@testSocial",2222)
-  testMember = Role("testMember",client.servers[0].name,"@testMember",3333)
-  testPUG = Role("testPUG",client.servers[0].name,"@testPUG",4444)
+  testRaider = Role("testRaider",s.name,"@testRaider",1111)
+  testSocial = Role("testSocial",s.name,"@testSocial",2222)
+  testMember = Role("testMember",s.name,"@testMember",3333)
+  testPUG = Role("testPUG",s.name,"@testPUG",4444)
 
-  client.servers[0].mapRole(testRaider,"Raider")
-  client.servers[0].mapRole(testSocial,"Social")
-  client.servers[0].mapRole(testMember,"Member")
-  client.servers[0].mapRole(testPUG,"PUG")
+  s.mapRole(testRaider,"Raider")
+  s.mapRole(testSocial,"Social")
+  s.mapRole(testMember,"Member")
+  s.mapRole(testPUG,"PUG")
 
   try:
     # Tests
-    assert client.servers[0].Raider == testRaider
-    assert client.servers[0].Social == testSocial
-    assert client.servers[0].Member == testMember
-    assert client.servers[0].PUG == testPUG
+    assert s.Raider == testRaider
+    assert s.Social == testSocial
+    assert s.Member == testMember
+    assert s.PUG == testPUG
     # Exception handling
     with pytest.raises(AttributeError,match="Unknown Schedule option"):
-      client.servers[0].mapRole(testRaider,"bad")
+      s.mapRole(testRaider,"bad")
     # Test DB writes
-    assert client.servers[0].db.get("Raider") == testRaider.id
-    assert client.servers[0].db.get("Social") == testSocial.id
-    assert client.servers[0].db.get("Member") == testMember.id
-    assert client.servers[0].db.get("PUG") == testPUG.id
+    assert s.db.get("Raider") == testRaider.id
+    assert s.db.get("Social") == testSocial.id
+    assert s.db.get("Member") == testMember.id
+    assert s.db.get("PUG") == testPUG.id
   finally:
     # clear out DBs
     os.remove(os.path.join(project_root,"databases","rolesTest.db","server.db"))
     os.remove(os.path.join(project_root,"databases","rolesTest.db","roster.db"))
+    os.remove(os.path.join(project_root,"databases","rolesTest.db","events.db"))
     os.rmdir(os.path.join(project_root,"databases","rolesTest.db"))
     client.servers.pop(client.server_ids.index("rolesTest"))
     client.server_ids.pop(client.server_ids.index("rolesTest"))
@@ -276,6 +280,7 @@ def test_updateRoster():
     # clear out DBs
     os.remove(os.path.join(project_root,"databases","rosterTest.db","server.db"))
     os.remove(os.path.join(project_root,"databases","rosterTest.db","roster.db"))
+    os.remove(os.path.join(project_root,"databases","rosterTest.db","events.db"))
     os.rmdir(os.path.join(project_root,"databases","rosterTest.db"))
     client.servers.pop(client.server_ids.index("rosterTest"))
     client.server_ids.pop(client.server_ids.index("rosterTest"))
@@ -340,6 +345,7 @@ def test_getRoles():
     # clear out DBs
     os.remove(os.path.join(project_root,"databases","0001.db","server.db"))
     os.remove(os.path.join(project_root,"databases","0001.db","roster.db"))
+    os.remove(os.path.join(project_root,"databases","0001.db","events.db"))
     os.rmdir(os.path.join(project_root,"databases","0001.db"))
     client.servers.pop(client.server_ids.index("0001"))
     client.server_ids.pop(client.server_ids.index("0001"))
@@ -385,6 +391,7 @@ def test_getRoles():
     # clear out DBs
     os.remove(os.path.join(project_root,"databases","0002.db","server.db"))
     os.remove(os.path.join(project_root,"databases","0002.db","roster.db"))
+    os.remove(os.path.join(project_root,"databases","0002.db","events.db"))
     os.rmdir(os.path.join(project_root,"databases","0002.db"))
     client.servers.pop(client.server_ids.index("0002"))
     client.server_ids.pop(client.server_ids.index("0002"))
@@ -441,6 +448,395 @@ def test_getRoster():
     # clear out DBs
     os.remove(os.path.join(project_root,"databases","0001.db","server.db"))
     os.remove(os.path.join(project_root,"databases","0001.db","roster.db"))
+    os.remove(os.path.join(project_root,"databases","0001.db","events.db"))
     os.rmdir(os.path.join(project_root,"databases","0001.db"))
     client.servers.pop(client.server_ids.index("0001"))
     client.server_ids.pop(client.server_ids.index("0001"))
+
+def test_addEvent():
+  """
+  GIVEN the addEvent function and an appropriately constructed Event object
+  WHEN the function is called
+  THEN add the Event to the database and list of local event objects
+  """
+
+  # build the client for this test
+  client = None
+  client = server.SchedClient(command_prefix='!')
+  s = client.addServer(
+    id = "addEvent",
+    name = "Server for addEvent test",
+    owner = "TestOwner"
+  )
+  # build the event objects for this test
+  d = datetime.datetime.now()
+  rec = event.Event(d,"recurring event",True,"weekly")
+  rec1 = event.Event(d+datetime.timedelta(0,60),"recurring event",True,"weekly")
+  once = event.Event(d,"occurs once",False)
+  once_str = "{0}{1}".format(once.name,str(once.date))
+  once_id = hashlib.md5(once_str.encode("utf-8")).hexdigest()
+  raid = event.Raid(d,"recurring raid",True,"monthly")
+
+  try:
+    # run Tests
+    ## add first event
+    s.addEvent(rec)
+    assert s.events[0] == rec
+    rec_db = s.events_db.get(rec.name)
+    assert rec_db
+    assert rec_db[0] == "event"
+    assert s.events[0].date == datetime.datetime.fromisoformat(rec_db[1])
+    assert s.events[0].name == rec_db[2]
+    assert s.events[0].recurring == rec_db[3]
+    assert s.events[0].frequency == rec_db[4]
+    ## add second event
+    s.addEvent(once)
+    assert s.events[0] == rec
+    rec_db = s.events_db.get(rec.name)
+    assert rec_db
+    assert rec_db[0] == "event"
+    assert s.events[0].date == datetime.datetime.fromisoformat(rec_db[1])
+    assert s.events[0].name == rec_db[2]
+    assert s.events[0].recurring == rec_db[3]
+    assert s.events[0].frequency == rec_db[4]
+    assert s.events[1] == once
+    once_db = s.events_db.get(once_id)
+    assert once_db
+    assert once_db[0] == "event"
+    assert s.events[1].date == datetime.datetime.fromisoformat(once_db[1])
+    assert s.events[1].name == once_db[2]
+    assert s.events[1].recurring == once_db[3]
+    assert s.events[1].frequency == once_db[4]
+    ## add third event
+    s.addEvent(raid)
+    assert s.events[0] == rec
+    rec_db = s.events_db.get(rec.name)
+    assert rec_db
+    assert rec_db[0] == "event"
+    assert s.events[0].date == datetime.datetime.fromisoformat(rec_db[1])
+    assert s.events[0].name == rec_db[2]
+    assert s.events[0].recurring == rec_db[3]
+    assert s.events[0].frequency == rec_db[4]
+    assert s.events[1] == once
+    once_db = s.events_db.get(once_id)
+    assert once_db
+    assert once_db[0] == "event"
+    assert s.events[1].date == datetime.datetime.fromisoformat(once_db[1])
+    assert s.events[1].name == once_db[2]
+    assert s.events[1].recurring == once_db[3]
+    assert s.events[1].frequency == once_db[4]
+    assert s.events[2] == raid
+    raid_db = s.events_db.get(raid.name)
+    assert raid_db
+    assert raid_db[0] == "raid"
+    assert s.events[2].date == datetime.datetime.fromisoformat(raid_db[1])
+    assert s.events[2].name == raid_db[2]
+    assert s.events[2].recurring == raid_db[3]
+    assert s.events[2].frequency == raid_db[4]
+    ## Throw error of event with that name FileExistsError
+    with pytest.raises(ValueError,match="Event exists"):
+      s.addEvent(raid)
+    ## throw error if we try to add a recurring event with the same name
+    with pytest.raises(ValueError,match="Recurring event with this name exists; mark event as not recurring or select a unique name"):
+      s.addEvent(rec1)
+    ## but allow it if its the same name but not recurring
+    one_raid = event.Raid(d,"recurring raid",False)
+    one_raid_str = "{0}{1}".format(one_raid.name,str(one_raid.date))
+    one_raid_id = hashlib.md5(one_raid_str.encode("utf-8")).hexdigest()
+    s.addEvent(one_raid)
+    assert one_raid in s.events
+    one_raid_db = s.events_db.get(one_raid_id)
+    assert one_raid_db[0] == "raid"
+    assert datetime.datetime.fromisoformat(one_raid_db[1]) == one_raid.date
+    assert one_raid_db[2] == one_raid.name
+    assert one_raid_db[3] == one_raid.recurring
+    assert one_raid_db[4] == one_raid.frequency
+
+  finally:
+    # clear out DBs
+    os.remove(os.path.join(project_root,"databases","addEvent.db","server.db"))
+    os.remove(os.path.join(project_root,"databases","addEvent.db","roster.db"))
+    os.remove(os.path.join(project_root,"databases","addEvent.db","events.db"))
+    os.rmdir(os.path.join(project_root,"databases","addEvent.db"))
+    client.servers.pop(client.server_ids.index("addEvent"))
+    client.server_ids.pop(client.server_ids.index("addEvent"))
+
+def test_getEvents():
+  """
+  GIVEN correctly constructed SchedClient, and a Server object with existing events in the database
+  WHEN the SchedClient sets up
+  THEN read in the database, create event objects, and store them in the appropriate Server attribute
+  """
+
+  # Create the client
+  client = None
+  client = server.SchedClient(command_prefix='!')
+  client.setup()
+  s = client.addServer(
+    id = "getEvents",
+    name = "Server for getEvents test",
+    owner = "TestOwner"
+  )
+  # create an event
+  d = datetime.datetime.now()
+  e = event.Event(d,"test event",True,"weekly")
+  # add event to the server
+  s.addEvent(e)
+  # recreate the client
+  newClient = server.SchedClient(command_prefix='!')
+  newClient.setup()
+
+  # test
+  try:
+    newS = newClient.servers[newClient.server_ids.index("getEvents")]
+    # run the function
+    newS.getEvents()
+    assert len(newS.events) == 1
+    assert newS.events[0].date == e.date
+    assert newS.events[0].name == e.name
+    assert newS.events[0].recurring == e.recurring
+    assert newS.events[0].frequency == e.frequency
+  finally:
+    os.remove(os.path.join(project_root,"databases","getEvents.db","server.db"))
+    os.remove(os.path.join(project_root,"databases","getEvents.db","roster.db"))
+    os.remove(os.path.join(project_root,"databases","getEvents.db","events.db"))
+    os.rmdir(os.path.join(project_root,"databases","getEvents.db"))
+    client.servers.pop(client.server_ids.index("getEvents"))
+    client.server_ids.pop(client.server_ids.index("getEvents"))
+    newClient.servers.pop(newClient.server_ids.index("getEvents"))
+    newClient.server_ids.pop(newClient.server_ids.index("getEvents"))
+
+def test_deleteEvent():
+  """
+  GIVEN correctly structued Server object, the name of an event, and at least one modifier (all/one,date,time)
+  WHEN the method is called
+  THEN delete instances of the object based on the modifiers
+  """
+
+  # Create the client
+  client = None
+  client = server.SchedClient(command_prefix='!')
+  client.setup()
+  s = client.addServer(
+    id = "deleteEvent",
+    name = "Server for deleteEvent test",
+    owner = "TestOwner"
+  )
+  # create an event
+  d = datetime.datetime.now()
+  rec = event.Event(d,"test event",True,"weekly")
+  rec1 = event.Event(d+datetime.timedelta(0,60),"test event",True,"weekly")
+  rec2 = event.Event(d+datetime.timedelta(0,60),"test event",False)
+  one = event.Raid(d,"second event",False)
+
+  try:
+    s.addEvent(rec)
+    ## Delete only event
+    s.deleteEvent(rec.name)
+    assert s.events == []
+    assert len(s.events_db.getall()) == 0
+    ## Delete one of multiple events
+    ### a recurring event
+    s.addEvent(rec)
+    s.addEvent(one)
+    s.deleteEvent(rec.name)
+    assert s.events == [one]
+    assert len(s.events_db.getall()) == 1
+    ### a one-time event
+    s.addEvent(rec)
+    s.deleteEvent(one.name)
+    assert s.events == [rec]
+    assert len(s.events_db.getall()) == 1
+    ## delete unknown event
+    s.deleteEvent(rec.name)
+    with pytest.raises(ValueError,match="Unknown Event"):
+      s.deleteEvent(rec.name)
+    ## delete non-unique event without date/time
+    s.addEvent(rec)
+    s.addEvent(rec2)
+    with pytest.raises(ValueError,match="Operation type \'one\' must have a unique name OR inputs for \'date\' and \'time\'"):
+      s.deleteEvent(rec.name,"one")
+    ## delete unique event when multiple exist
+    s.deleteEvent(rec1.name,"one",d.strftime("%d%b%Y").upper(),(d+datetime.timedelta(0,60)).strftime("%H:%M"))
+    assert rec1 not in s.events
+    assert rec in s.events
+    ## delete all events
+    s.addEvent(rec2)
+    print(list(map(lambda x: [x.name,str(x.date)],s.events)))
+    print(s.events_db.getall())
+    s.deleteEvent(rec.name,"all")
+    assert rec1 not in s.events
+    assert rec not in s.events
+
+  finally:
+    os.remove(os.path.join(project_root,"databases","deleteEvent.db","server.db"))
+    os.remove(os.path.join(project_root,"databases","deleteEvent.db","roster.db"))
+    os.remove(os.path.join(project_root,"databases","deleteEvent.db","events.db"))
+    os.rmdir(os.path.join(project_root,"databases","deleteEvent.db"))
+    client.servers.pop(client.server_ids.index("deleteEvent"))
+    client.server_ids.pop(client.server_ids.index("deleteEvent"))
+
+def test_setEvent():
+  """
+  GIVEN SchedClient object with at least one correctly formatted event and specified property and value to change
+  WHEN the method is called
+  THEN update the local and DB copies of the event as appropriate with the specified settings
+  """
+
+  # Create the client
+  client = None
+  client = server.SchedClient(command_prefix='!')
+  client.setup()
+  s = client.addServer(
+    id = "setEvent",
+    name = "Server for setEvent test",
+    owner = "TestOwner"
+  )
+  # create an event
+  d = datetime.datetime.now()
+  d_date = d +datetime.timedelta(1)
+  d_time = d_date+datetime.timedelta(0,60)
+  d2 = d + datetime.timedelta(2,120)
+  d2_date = d2 + datetime.timedelta(1)
+  d2_time = d2_date + datetime.timedelta(0,60)
+  e1 = event.Event(d,"test event",True,"weekly")
+  e2 = event.Event(d,"test event2",False)
+  e3 = event.Event(d2,"test event2",False)
+
+  # add event to the server
+  s.addEvent(e1)
+  s.addEvent(e2)
+  e1index = s.events.index(list(filter((lambda x: x.name == e1.name),s.events))[0])
+  e2index = s.events.index(list(filter((lambda x: x.name == e2.name),s.events))[0])
+
+  try:
+    # change one event
+    ## Change the date of the event
+    s.setEvent("one",e1.name,"date",d_date.date(),d)
+    assert s.events[e1index].name == e1.name
+    assert s.events[e1index].date == d_date
+    assert s.events[e1index].recurring == e1.recurring
+    assert s.events[e1index].frequency == e1.frequency
+    ## Change the time of the event
+    s.setEvent("one",e1.name,"time",d_time.time(),d_date)
+    assert s.events[e1index].name == e1.name
+    assert s.events[e1index].date == d_time
+    assert s.events[e1index].recurring == e1.recurring
+    assert s.events[e1index].frequency == e1.frequency
+    ## change the name of the event
+    s.setEvent("one",e1.name,"name","changed test event",d_time)
+    assert s.events[e1index].name == "changed test event"
+    assert s.events[e1index].date == d_time
+    assert s.events[e1index].recurring == e1.recurring
+    assert s.events[e1index].frequency == e1.frequency
+    ## change the frequency of the event
+    s.setEvent("one","changed test event","frequency","monthly",d_time)
+    assert s.events[e1index].name == "changed test event"
+    assert s.events[e1index].date == d_time
+    assert s.events[e1index].recurring == e1.recurring
+    assert s.events[e1index].frequency == e1.frequency
+    ## change the recurring status of the event
+    s.setEvent("one","changed test event","recurring",False,d_time)
+    assert s.events[e1index].name == "changed test event"
+    assert s.events[e1index].date == d_time
+    assert s.events[e1index].recurring == False
+    assert s.events[e1index].frequency == None
+    ## other events didnt change
+    assert s.events[e2index].name == e2.name
+    assert s.events[e2index].date == e2.date
+    assert s.events[e2index].recurring == e2.recurring
+    assert s.events[e2index].frequency == e2.frequency
+    ## throw errors
+    ### tried to change frequency but event is not recurring
+    with pytest.raises(ValueError,match="Cannot change frequency for one-time event"):
+      s.setEvent("one","changed test event","frequency","weekly",d_time)
+    ### date and time not provided
+    s.addEvent(e3)
+    with pytest.raises(ValueError,match="Operation type \'one\' must have a unique name OR inputs for \'date\' and \'time\'"):
+      s.setEvent("one","test event2","recurring",True)
+    # change all events
+    e3index = s.events.index(list(filter((lambda x: x.name == e3.name and x.date == e3.date),s.events))[0])
+    ## Change the date of the events
+    s.setEvent("all",e2.name,"date",d2_date.date())
+    assert s.events[e2index].name == e2.name
+    assert s.events[e2index].date == d2_date-datetime.timedelta(0,120)
+    assert s.events[e2index].recurring == e2.recurring
+    assert s.events[e2index].frequency == e2.frequency
+    assert s.events[e3index].name == e3.name
+    assert s.events[e3index].date == d2_date
+    assert s.events[e3index].recurring == e3.recurring
+    assert s.events[e3index].frequency == e3.frequency
+    ## reset for next battery
+    s.setEvent("one",e2.name,"date",d,s.events[e2index].date)
+    ## Change the time of the events
+    s.setEvent("all",e2.name,"time",d2_time.time())
+    assert s.events[e2index].name == e2.name
+    assert s.events[e2index].date == d2_time-datetime.timedelta(3,0)
+    assert s.events[e2index].recurring == e2.recurring
+    assert s.events[e2index].frequency == e2.frequency
+    assert s.events[e3index].name == e3.name
+    assert s.events[e3index].date == d2_time
+    assert s.events[e3index].recurring == e3.recurring
+    assert s.events[e3index].frequency == e3.frequency
+    ## change the name of the events
+    s.setEvent("all",e2.name,"name","changed "+e2.name)
+    assert s.events[e2index].name == "changed test event2"
+    assert s.events[e2index].date == d2_time-datetime.timedelta(3)
+    assert s.events[e2index].recurring == e2.recurring
+    assert s.events[e2index].frequency == e2.frequency
+    assert s.events[e3index].name == "changed test event2"
+    assert s.events[e3index].date == d2_time
+    assert s.events[e3index].recurring == e3.recurring
+    assert s.events[e3index].frequency == e3.frequency
+
+    ## other event didnt change
+    assert s.events[e1index].name == "changed test event"
+    assert s.events[e1index].date == d_time
+    assert s.events[e1index].recurring == False
+    assert s.events[e1index].frequency == None
+    ## throw errors
+    ### cannot change recurring of all events
+    with pytest.raises(ValueError,match="Operation \'all\' cannot be used to change event \'recurring\' status"):
+      s.setEvent("all","changed test event2","recurring",True)
+    ### cannot change frequency of all events
+    with pytest.raises(ValueError,match="Operation \'all\' cannot be used to change event frequency"):
+      s.setEvent("all","changed test event2","frequency","weekly")
+    # event does not exist
+    ## by name
+    with pytest.raises(ValueError,match="Unknown Event"):
+      s.setEvent("one","bad name","date",d_date.date(),d)
+    ## by time
+    with pytest.raises(ValueError,match="Matching event found with incorrect inputs \'date\' or \'time\'"):
+      s.setEvent("one",e1.name,"date",d_date.date(),d-datetime.timedelta(4))
+
+    ## Last up, check the events in the database
+    e1_id = hashlib.md5("{0}{1}".format(e1.name,str(e1.date)).encode("utf-8")).hexdigest()
+    e2_id = hashlib.md5("{0}{1}".format(e2.name,str(e2.date)).encode("utf-8")).hexdigest()
+    e3_id = hashlib.md5("{0}{1}".format(e3.name,str(e3.date)).encode("utf-8")).hexdigest()
+    e1db = s.events_db.get(e1_id)
+    assert e1db
+    e2db = s.events_db.get(e2_id)
+    assert e2db
+    e3db = s.events_db.get(e3_id)
+    assert e3db
+    assert len(s.events_db.getall()) == 3
+    assert e1db[1] == str(e1.date)
+    assert e1db[2] == e1.name
+    assert e1db[3] == e1.recurring
+    assert e1db[4] == e1.frequency
+    assert e2db[1] == str(e2.date)
+    assert e2db[2] == e2.name
+    assert e2db[3] == e2.recurring
+    assert e2db[4] == e2.frequency
+    assert e3db[1] == str(d2_time)
+    assert e3db[2] == e3.name
+    assert e3db[3] == e3.recurring
+    assert e3db[4] == e3.frequency
+
+  finally:
+    os.remove(os.path.join(project_root,"databases","setEvent.db","server.db"))
+    os.remove(os.path.join(project_root,"databases","setEvent.db","roster.db"))
+    os.remove(os.path.join(project_root,"databases","setEvent.db","events.db"))
+    os.rmdir(os.path.join(project_root,"databases","setEvent.db"))
+    client.servers.pop(client.server_ids.index("setEvent"))
+    client.server_ids.pop(client.server_ids.index("setEvent"))
