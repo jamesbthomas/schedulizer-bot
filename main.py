@@ -15,8 +15,9 @@ project_root = os.path.dirname(__file__)
 sys.path.append(os.path.join(project_root,"classes"))
 
 # Import subpackages
-import server, player
+import server
 from event import *
+from player import *
 
 # Build the Intents object for the client
 intents = discord.Intents.default()
@@ -47,7 +48,7 @@ async def on_ready():
       # Create user objects for each player with a valid schedule role
       for member in guild.members:
         try:
-          p = player.Player(member.name,sched=discord.utils.find(lambda r: r == server.Raider or r == server.Social or r == server.Member or r == server.PUG,member.roles).name)
+          p = Player(member.name,sched=discord.utils.find(lambda r: r == server.Raider or r == server.Social or r == server.Member or r == server.PUG,member.roles).name)
           server.updateRoster(p)
         except AttributeError:
           continue
@@ -67,16 +68,15 @@ async def on_ready():
 async def helloWorld(context):
   await context.send("Hello World!")
 
-@client.command(name="show",help="Displays different information. Usage: !show [roster|events]")
+@client.command(name="show",help="Displays different information.\nUsage: !show [roster|events]\nNote: !show roster only shows players with on the Raider or Social schedule. To see other players use !player show <name>")
 async def show(context,opt: str):
   server = client.servers[client.server_ids.index(context.guild.id)]
   if opt == "roster":
-    roster = []
-    for p in server.roster:
-      if p.sched != "Pug":
-        roster.append(str(p))
-      else:
-        continue
+    ## TODO - this displays really weird, find a better way to show the roster as a command
+    ### have to send each line individually, roster gets too big for a single message
+    ### maybe write it to a file, upload the file, then delete the file?
+    roster = map(lambda x: str(x),list(filter(lambda x: x.sched == "Raider" or x.sched == "Social",server.roster)))
+    await context.trigger_typing()
     await context.send("\n".join(roster))
   elif opt == "events":
     events = []
@@ -278,7 +278,7 @@ async def event(context, *args):
     message = "Successfully changed property {0} of event {1} to {2}".format(property,name,value)
   await context.send(message)
 
-@client.command(name="player",help="Manipulate Player objects.\nUsage:\n!player set <name> <property> <val>\n!player show <name> [<property>]")
+@client.command(name="player",help="Manipulate Player objects.\nUsage:\n!player set <name> <property> <val>\n!player show <name>\nNote: To set multiple roles for a player, use the following syntax: !player set <name> roles <first Role>,<second Role>")
 async def player(context, *args):
   operation, name, property, value = [None]*4
   try:
@@ -288,7 +288,6 @@ async def player(context, *args):
     value = args[3]
   except IndexError:
     None
-  
   # Check the operation is approved
   if operation == "set":
     if property == None:
@@ -309,11 +308,37 @@ async def player(context, *args):
   if player == None:
     raise ValueError("Unknown Player")
   # make sure the player object has a property associated with the input
-  if not hasattr(player,property):
+  if property != None and not hasattr(player,property):
     raise ValueError("Unknown property")
+  ## SHOW
+  if operation == "show":
+    await context.send(str(player))
+  elif operation == "set":
+    if property == "roles":
+      value = value.split(",")
+      ## check that the user input valid roles
+      for r in value:
+        if r not in ["Tank","Healer","DPS"]:
+          raise ValueError("Unknown role")
+    server.changePlayer(player,property,value)
+    #await context.send("STUB SET\tname: {1};property: {2};value: {3}".format(operation,name,property,value))
+    await context.send("Changed property {0} of player {1} to {2}".format(property,name,str(value)))
+  else:
+    raise RuntimeError("Unknown operation")
 
-  await context.send("STUB operation: {0};name: {1};property:{2};value:{3} ".format(operation,name,property,value))
-
+@client.command(name="update",help="Force the server to rebuild certain components\nUsage:\t!update <component>\nAvailable Components: roster")
+async def update(context,component):
+  if component == "roster":
+    server = client.servers[client.server_ids.index(context.guild.id)]
+    for member in context.guild.members:
+      try:
+        p = Player(member.name,sched=discord.utils.find(lambda r: r == server.Raider or r == server.Social or r == server.Member or r == server.PUG,member.roles).name)
+        server.updateRoster(p)
+      except AttributeError:
+        continue
+  else:
+    raise ValueError("Unknown component")
+  await context.send("Update complete, issue \'!show roster\' to check")
 
 @client.event
 async def on_command_error(context,error):

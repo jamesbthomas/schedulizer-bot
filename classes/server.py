@@ -153,6 +153,15 @@ class Server(object):
         self.roster.append(p)
       return
 
+    def changePlayer(self,player,prop,val):
+      if prop == "sched":
+        player.updatePlayer(sched=val)
+      elif prop == "roles":
+        player.updatePlayer(roles=val)
+      else:
+        raise ValueError("Unknown property")
+      self.updateRoster(player)
+
     def mapRole(self,role,sched):
       if role == None:
         return

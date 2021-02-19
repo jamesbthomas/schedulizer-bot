@@ -840,3 +840,95 @@ def test_setEvent():
     os.rmdir(os.path.join(project_root,"databases","setEvent.db"))
     client.servers.pop(client.server_ids.index("setEvent"))
     client.server_ids.pop(client.server_ids.index("setEvent"))
+
+def test_changePlayer():
+  """
+  GIVEN server object with a roster, a player object, and a property and value combination
+  WHEN the method is called
+  THEN use the Player.updatePlayer() method to modify the player object and update the database
+  """
+
+  # Create the client
+  client = None
+  client = server.SchedClient(command_prefix='!')
+  client.setup()
+  s = client.addServer(
+    id = "changePlayer",
+    name = "Server for changePlayer test",
+    owner = "TestOwner"
+  )
+  # create player objects
+  fullPlayer = player.Player("testPlayer#1111",sched="Social",roles=["Tank","DPS"])
+  schedPlayer = player.Player("testPlayer#2222",sched="Raider")
+  rolesPlayer = player.Player("testPlayer#3333",roles=["Healer","DPS"])
+  roster = [fullPlayer,schedPlayer,rolesPlayer]
+
+  try:
+    # add to the roster
+    s.updateRoster(fullPlayer)
+    s.updateRoster(schedPlayer)
+    s.updateRoster(rolesPlayer)
+    assert s.roster == roster
+    # TESTS
+    ## add attribute to previously empty
+    ### roles
+    s.changePlayer(schedPlayer,"roles",["Tank","Healer"])
+    #### check local
+    assert schedPlayer.name == "testPlayer#2222"
+    assert schedPlayer.sched == "Raider"
+    assert schedPlayer.roles == ["Tank","Healer"]
+    assert player.Player("testPlayer#2222",sched="Raider") not in s.roster
+    #### check db
+    sched_db = s.roster_db.get(schedPlayer.name)
+    assert schedPlayer.sched == sched_db[0]
+    assert schedPlayer.roles == sched_db[1]
+    ### sched
+    s.changePlayer(rolesPlayer,"sched","Social")
+    #### check local
+    assert rolesPlayer.name == "testPlayer#3333"
+    assert rolesPlayer.sched == "Social"
+    assert rolesPlayer.roles == ["Healer","DPS"]
+    assert player.Player("testPlayer#3333",roles=["Healer","DPS"]) not in s.roster
+    #### check db
+    roles_db = s.roster_db.get(rolesPlayer.name)
+    assert rolesPlayer.sched == roles_db[0]
+    assert rolesPlayer.roles == roles_db[1]
+    ## change existing attribute
+    ### roles
+    s.changePlayer(schedPlayer,"roles",["Tank","DPS"])
+    #### check local
+    assert schedPlayer.name == "testPlayer#2222"
+    assert schedPlayer.sched == "Raider"
+    assert schedPlayer.roles == ["Tank","DPS"]
+    assert player.Player("testPlayer#2222",sched="Raider",roles=["Tank","Healer"]) not in s.roster
+    #### check db
+    sched_db = s.roster_db.get(schedPlayer.name)
+    assert schedPlayer.sched == sched_db[0]
+    assert schedPlayer.roles == sched_db[1]
+    ### sched
+    s.changePlayer(rolesPlayer,"sched","Raider")
+    #### check local
+    assert rolesPlayer.name == "testPlayer#3333"
+    assert rolesPlayer.sched == "Raider"
+    assert rolesPlayer.roles == ["Healer","DPS"]
+    assert player.Player("testPlayer#3333",sched="Social",roles=["Healer","DPS"]) not in s.roster
+    #### check db
+    roles_db = s.roster_db.get(rolesPlayer.name)
+    assert rolesPlayer.sched == roles_db[0]
+    assert rolesPlayer.roles == roles_db[1]
+    ## make sure other objects didnt change
+    ### check local
+    assert fullPlayer in s.roster
+    assert fullPlayer == s.roster[s.roster.index(fullPlayer)]
+    ### check db
+    full_db = s.roster_db.get(fullPlayer.name)
+    assert fullPlayer.sched == full_db[0]
+    assert fullPlayer.roles == full_db[1]
+
+  finally:
+    os.remove(os.path.join(project_root,"databases","changePlayer.db","server.db"))
+    os.remove(os.path.join(project_root,"databases","changePlayer.db","roster.db"))
+    os.remove(os.path.join(project_root,"databases","changePlayer.db","events.db"))
+    os.rmdir(os.path.join(project_root,"databases","changePlayer.db"))
+    client.servers.pop(client.server_ids.index("changePlayer"))
+    client.server_ids.pop(client.server_ids.index("changePlayer"))
