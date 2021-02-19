@@ -12,7 +12,7 @@ class Player(object):
 
   def __str__(self):
     try:
-      return "Name: "+self.name+"; Sched: "+self.sched+"; Roles: "+",".join(self.roles)
+      return "Name: "+self.name+"; Sched: "+self.sched+"; Roles: "+" > ".join(self.roles)
     except:
       return "Name: "+self.name+"; Sched: "+self.sched+"; Roles: N/A"
 
