@@ -119,42 +119,33 @@ def test_keepTime():
     t.join()
     ## grab the db_lock as a second check to make sure everything is closed
     db_lock.acquire()
-    #s.events_db = pickledb.load(os.path.join(s.db_path,"events.db"),False)
+    s.events_db = pickledb.load(os.path.join(s.db_path,"events.db"),False)
 
     # run tests
     ## non-recurring previous event should be gone
-#    assert onceHappened not in s.events
     assert onceH_id not in s.events_db.getall()
     ## non-recurring future event should still be there
-#    assert onceFuture in s.events
     assert onceF_id in s.events_db.getall()
     ## recurring previous event should have new instance
     ### weekly
-#    assert recurringHappenedW not in s.events
     newHappenedW = event.Event(d-datetime.timedelta(2)+datetime.timedelta(7),"recurring event weekly",True,"weekly")
-    e = next(filter(lambda x: x.name == newHappenedW.name,s.events))
-    assert newHappenedW.date == e.date
-    assert newHappenedW.name == e.name
-    assert newHappenedW.recurring == e.recurring
-    assert newHappenedW.frequency == e.frequency
+    assert newHappenedW.name in s.events_db.getall()
     e_db = s.events_db.get(newHappenedW.name)
-    assert newHappenedW.date == e_db.date
-    assert newHappenedW.name == e_db.name
-    assert newHappenedW.recurring == e_db.recurring
-    assert newHappenedW.frequency == e_db.frequency
+    assert e_db
+    print(e_db)
+    assert newHappenedW.date == datetime.datetime.fromisoformat(e_db[1])
+    assert newHappenedW.name == e_db[2]
+    assert newHappenedW.recurring == e_db[3]
+    assert newHappenedW.frequency == e_db[4]
     ### monthly
-#    assert recurringHappenedM not in s.events
     newHappenedM = event.Event(d-datetime.timedelta(2)+datetime.timedelta(28),"recurring event monthly",True,"monthly")
-    e = next(filter(lambda x: x.name == newHappenedW.name,s.events))
-    assert newHappenedM.date == e.date
-    assert newHappenedM.name == e.name
-    assert newHappenedM.recurring == e.recurring
-    assert newHappenedM.frequency == e.frequency
+    assert newHappenedM.name in s.events_db.getall()
     e_db = s.events_db.get(newHappenedM.name)
-    assert newHappenedM.date == e_db.date
-    assert newHappenedM.name == e_db.name
-    assert newHappenedM.recurring == e_db.recurring
-    assert newHappenedM.frequency == e_db.frequency
+    assert e_db
+    assert newHappenedM.date == datetime.datetime.fromisoformat(e_db[1])
+    assert newHappenedM.name == e_db[2]
+    assert newHappenedM.recurring == e_db[3]
+    assert newHappenedM.frequency == e_db[4]
 
   finally:
     os.remove(os.path.join(project_root,"databases","keepTime.db","server.db"))
