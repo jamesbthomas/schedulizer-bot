@@ -1,6 +1,6 @@
 # Defines the Server class and extends the Discord.Client class to track it
 
-import discord, pickledb, os, player, event, datetime, hashlib
+import discord, pickledb, os, player, event, datetime, hashlib, threading
 from discord.ext import commands
 
 class Server(object):
@@ -14,37 +14,53 @@ class Server(object):
         t = "event"
       else:
         raise TypeError("Input must be a propertly constructed Event or Raid object")
+      ## make sure the db is up to date
+      self.event_lock.acquire()
+      self.events_db._loaddb()
       ## make sure we dont already have this event
-      if e in self.events:
-        raise ValueError("Event exists")
-      # Turn the event into a list for storage in the DB
-      eList = [t,str(e.date),e.name,e.recurring,e.frequency]
-      ## make sure we dont already have a recurring event with this name
-      if e.name in self.events_db.getall() and e.recurring:
-        raise ValueError("Recurring event with this name exists; mark event as not recurring or select a unique name")
-      # add event to list of events
-      self.events.append(e)
-      # generate a unique identifier
-      ## repeating events dont get an identifier
       if e.recurring:
         id = e.name
-      ## one-time events are identified by the unique hash of the event name and date
       else:
-        id_str = "{0}{1}".format(e.name,str(e.date))
-        id = hashlib.md5(id_str.encode("utf-8")).hexdigest()
+        id = hashlib.md5("{0}{1}".format(e.name,str(e.date)).encode("utf-8")).hexdigest()
+      if id in self.events_db.getall():
+        self.event_lock.release()
+        e_db = self.events_db.get(id)
+        if e_db[3]:
+          raise ValueError("Recurring event with this name exists; mark event as not recurring or select a unique name")
+        else:
+          raise ValueError("Event exists")
+      # Turn the event into a list for storage in the DB
+      eList = [t,str(e.date),e.name,e.recurring,e.frequency]
       self.events_db.set(id,eList)
       self.events_db.dump()
+      self.event_lock.release()
       return True
 
     def deleteEvent(self,name,type = None,date = None, time = None):
+      ## make sure weve got the most up to date db
+      self.event_lock.acquire()
+      self.events_db._loaddb()
       ## get the number of events the name corresponds to
-      es = list(filter(lambda e: e.name == name,self.events))
+      keys = self.events_db.getall()
+      es = []
+      for key in keys:
+        e = self.events_db.get(key)
+        if e[2] == name:
+          if e[0] == "raid":
+            es.append(event.Raid(datetime.datetime.fromisoformat(e[1]),e[2],e[3],e[4]))
+          elif e[0] == "event":
+            es.append(event.Event(datetime.datetime.fromisoformat(e[1]),e[2],e[3],e[4]))
+          else:
+            self.event_lock.release()
+            raise RuntimeError("Unknown event type")
       numEvents = len(es)
       if numEvents < 1:
+        self.event_lock.release()
         raise ValueError("Unknown Event")
       ## Make sure inputs make sense
       if type == "one" and (date == None or time == None):
         if numEvents > 1:
+          self.event_lock.release()
           raise ValueError("Operation type \'one\' must have a unique name OR inputs for \'date\' and \'time\'")
       ## find the item(s) to delete
       if date != None:
@@ -60,33 +76,50 @@ class Server(object):
           id = hashlib.md5(id_str.encode("utf-8")).hexdigest()
         self.events_db.rem(id)
       self.events_db.dump()
-      ### from the list
-      self.events = list(filter(lambda e: e not in es,self.events))
+      self.event_lock.release()
 
     def setEvent(self,type,name,prop,val,d = None):
+      ## make sure weve got the most up to date db
+      self.event_lock.acquire()
+      self.events_db._loaddb()
       ## get total number of events to change
-      es = list(filter(lambda e: e.name == name,self.events))
+      keys = self.events_db.getall()
+      es = []
+      for key in keys:
+        e = self.events_db.get(key)
+        if e[2] == name:
+          if e[0] == "raid":
+            es.append(event.Raid(datetime.datetime.fromisoformat(e[1]),e[2],e[3],e[4]))
+          elif e[0] == "event":
+            es.append(event.Event(datetime.datetime.fromisoformat(e[1]),e[2],e[3],e[4]))
+          else:
+            self.event_lock.release()
+            raise RuntimeError("Unknown event type")
       numEvents = len(es)
       if numEvents < 1:
+        self.event_lock.release()
         raise ValueError("Unknown Event")
       ## type checking
       if type == "one" and (d == None):
         if numEvents > 1:
+          self.event_lock.release()
           raise ValueError("Operation type \'one\' must have a unique name OR inputs for \'date\' and \'time\'")
       elif type == "one":
         es = list(filter(lambda e: e.date == d,es))
         numEvents = len(es)
         if numEvents < 1:
+          self.event_lock.release()
           raise ValueError("Matching event found with incorrect inputs \'date\' or \'time\'")
       elif type == "all":
         if prop == "recurring":
+          self.event_lock.release()
           raise ValueError("Operation \'all\' cannot be used to change event \'recurring\' status")
         elif prop == "frequency":
+          self.event_lock.release()
           raise ValueError("Operation \'all\' cannot be used to change event frequency")
       ## iterate through list of events to change (es)
       for e in es:
         ## pull out the event we're modifying
-        index = self.events.index(e)
         if e.recurring:
           id = e.name
         else:
@@ -106,9 +139,11 @@ class Server(object):
             e.frequency = None
         elif prop == "frequency":
           if not e.recurring:
+            self.event_lock.release()
             raise ValueError("Cannot change frequency for one-time event")
           e.frequency = val
         else:
+          self.event_lock.release()
           raise ValueError("Unknown property")
         self.events_db.rem(id)
         ## build the list for storing in the database
@@ -121,6 +156,8 @@ class Server(object):
           id = hashlib.md5(id_str.encode("utf-8")).hexdigest()
         # add the event to the database
         self.events_db.set(id,eList)
+        self.events_db.dump()
+      self.event_lock.release()
 
     def getEvents(self):
       self.events_db = pickledb.load(os.path.join(self.db_path,"events.db"),False)
@@ -133,7 +170,6 @@ class Server(object):
           e = event.Event(datetime.datetime.fromisoformat(dbevent[1]),dbevent[2],dbevent[3],dbevent[4])
         else:
           continue
-        self.events.append(e)
       return
     
     def getRoles(self,roles):
@@ -202,19 +238,20 @@ class Server(object):
         ## TODO - turn this into a dictionary, key is the name value is the object
         self.roster = []
         self.roster_names = []
-        # For tracking the discord.Role objects on this server that correspond to our schedules
-        self.Raider = None
-        self.Social = None
-        self.Member = None
-        self.PUG = None
+        # setup thread tracking objects
+        self.exitFlag = threading.Event()
+        self.roster_lock = threading.Lock()
+        self.server_lock = threading.Lock()
+        self.event_lock = threading.Lock()
         # Create the database file for this server
+
         project_root = os.path.split(os.path.dirname(__file__))[0]
         try:
           os.makedirs(os.path.join(project_root,"databases",str(id)+".db"))
         except FileExistsError:
           None
         self.db_path = os.path.join(project_root,"databases",str(id)+".db")
-        self.db = pickledb.load(os.path.join(self.db_path,"server.db"), False)
+        self.db = pickledb.load(os.path.join(self.db_path,"server.db"), False,sig=False)
         self.db.set('id',id)
         self.db.set('name',name)
         self.db.set('owner',str(owner))
@@ -223,17 +260,20 @@ class Server(object):
         self.Member = self.db.get("Member") or None
         self.PUG = self.db.get("PUG") or None
         self.db.dump()
+
         # Create the database file for this server's roster
-        self.roster_db = pickledb.load(os.path.join(self.db_path,"roster.db"),False)
+
+        self.roster_db = pickledb.load(os.path.join(self.db_path,"roster.db"),False,sig=False)
         self.roster_db.dump()
+
         # Setup event tracking for this server
-        ## List of Event objects that will occur at some point in the future
-        ### List includes instances of recurring events, not the recurring events themselves
-        self.events = []
         ## create the database for this server's events
-        self.events_db = pickledb.load(os.path.join(self.db_path,"events.db"),False)
+
+        self.events_db = pickledb.load(os.path.join(self.db_path,"events.db"),False,sig=False)
         self.events_db.dump()
 
+        # create the timekeeper slot
+        self.timekeeper = None
 
 class SchedClient(commands.Bot):
 
@@ -255,6 +295,10 @@ class SchedClient(commands.Bot):
             server = Server(id,db.get('name'),db.get('owner'))
             self.servers.append(server)
             self.server_ids.append(id)
+            self.exitFlag = threading.Event()
+            self.roster_lock = threading.Lock()
+            self.server_lock = threading.Lock()
+            self.event_lock = threading.Lock()
           else:
             continue
 

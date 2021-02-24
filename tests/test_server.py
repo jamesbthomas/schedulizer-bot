@@ -481,61 +481,67 @@ def test_addEvent():
     # run Tests
     ## add first event
     s.addEvent(rec)
-    assert s.events[0] == rec
+    s.event_lock.acquire()
+    assert rec.name in s.events_db.getall()
     rec_db = s.events_db.get(rec.name)
     assert rec_db
     assert rec_db[0] == "event"
-    assert s.events[0].date == datetime.datetime.fromisoformat(rec_db[1])
-    assert s.events[0].name == rec_db[2]
-    assert s.events[0].recurring == rec_db[3]
-    assert s.events[0].frequency == rec_db[4]
+    assert rec.date == datetime.datetime.fromisoformat(rec_db[1])
+    assert rec.name == rec_db[2]
+    assert rec.recurring == rec_db[3]
+    assert rec.frequency == rec_db[4]
+    s.event_lock.release()
     ## add second event
     s.addEvent(once)
-    assert s.events[0] == rec
+    s.event_lock.acquire()
+    assert rec.name in s.events_db.getall()
     rec_db = s.events_db.get(rec.name)
     assert rec_db
     assert rec_db[0] == "event"
-    assert s.events[0].date == datetime.datetime.fromisoformat(rec_db[1])
-    assert s.events[0].name == rec_db[2]
-    assert s.events[0].recurring == rec_db[3]
-    assert s.events[0].frequency == rec_db[4]
-    assert s.events[1] == once
+    assert rec.date == datetime.datetime.fromisoformat(rec_db[1])
+    assert rec.name == rec_db[2]
+    assert rec.recurring == rec_db[3]
+    assert rec.frequency == rec_db[4]
+    assert once_id in s.events_db.getall()
     once_db = s.events_db.get(once_id)
     assert once_db
     assert once_db[0] == "event"
-    assert s.events[1].date == datetime.datetime.fromisoformat(once_db[1])
-    assert s.events[1].name == once_db[2]
-    assert s.events[1].recurring == once_db[3]
-    assert s.events[1].frequency == once_db[4]
+    assert once.date == datetime.datetime.fromisoformat(once_db[1])
+    assert once.name == once_db[2]
+    assert once.recurring == once_db[3]
+    assert once.frequency == once_db[4]
+    s.event_lock.release()
     ## add third event
     s.addEvent(raid)
-    assert s.events[0] == rec
+    s.event_lock.acquire()
+    assert rec.name in s.events_db.getall()
     rec_db = s.events_db.get(rec.name)
     assert rec_db
     assert rec_db[0] == "event"
-    assert s.events[0].date == datetime.datetime.fromisoformat(rec_db[1])
-    assert s.events[0].name == rec_db[2]
-    assert s.events[0].recurring == rec_db[3]
-    assert s.events[0].frequency == rec_db[4]
-    assert s.events[1] == once
+    assert rec.date == datetime.datetime.fromisoformat(rec_db[1])
+    assert rec.name == rec_db[2]
+    assert rec.recurring == rec_db[3]
+    assert rec.frequency == rec_db[4]
+    assert once_id in s.events_db.getall()
     once_db = s.events_db.get(once_id)
     assert once_db
     assert once_db[0] == "event"
-    assert s.events[1].date == datetime.datetime.fromisoformat(once_db[1])
-    assert s.events[1].name == once_db[2]
-    assert s.events[1].recurring == once_db[3]
-    assert s.events[1].frequency == once_db[4]
-    assert s.events[2] == raid
+    assert once.date == datetime.datetime.fromisoformat(once_db[1])
+    assert once.name == once_db[2]
+    assert once.recurring == once_db[3]
+    assert once.frequency == once_db[4]
+    assert raid.name in s.events_db.getall()
     raid_db = s.events_db.get(raid.name)
     assert raid_db
     assert raid_db[0] == "raid"
-    assert s.events[2].date == datetime.datetime.fromisoformat(raid_db[1])
-    assert s.events[2].name == raid_db[2]
-    assert s.events[2].recurring == raid_db[3]
-    assert s.events[2].frequency == raid_db[4]
+    assert raid.date == datetime.datetime.fromisoformat(raid_db[1])
+    assert raid.name == raid_db[2]
+    assert raid.recurring == raid_db[3]
+    assert raid.frequency == raid_db[4]
+    s.event_lock.release()
     ## Throw error of event with that name FileExistsError
     with pytest.raises(ValueError,match="Event exists"):
-      s.addEvent(raid)
+      s.addEvent(once)
     ## throw error if we try to add a recurring event with the same name
     with pytest.raises(ValueError,match="Recurring event with this name exists; mark event as not recurring or select a unique name"):
       s.addEvent(rec1)
@@ -544,15 +550,25 @@ def test_addEvent():
     one_raid_str = "{0}{1}".format(one_raid.name,str(one_raid.date))
     one_raid_id = hashlib.md5(one_raid_str.encode("utf-8")).hexdigest()
     s.addEvent(one_raid)
-    assert one_raid in s.events
+    s.event_lock.acquire()
+    assert one_raid_id in s.events_db.getall()
     one_raid_db = s.events_db.get(one_raid_id)
     assert one_raid_db[0] == "raid"
     assert datetime.datetime.fromisoformat(one_raid_db[1]) == one_raid.date
     assert one_raid_db[2] == one_raid.name
     assert one_raid_db[3] == one_raid.recurring
     assert one_raid_db[4] == one_raid.frequency
+    s.event_lock.release()
 
   finally:
+    # release the lock
+    try:
+      s.event_lock.release()
+    except RuntimeError as e:
+      if str(e) != "release unlocked lock":
+        raise
+      else:
+        None
     # clear out DBs
     os.remove(os.path.join(project_root,"databases","addEvent.db","server.db"))
     os.remove(os.path.join(project_root,"databases","addEvent.db","roster.db"))
@@ -591,11 +607,13 @@ def test_getEvents():
     newS = newClient.servers[newClient.server_ids.index("getEvents")]
     # run the function
     newS.getEvents()
-    assert len(newS.events) == 1
-    assert newS.events[0].date == e.date
-    assert newS.events[0].name == e.name
-    assert newS.events[0].recurring == e.recurring
-    assert newS.events[0].frequency == e.frequency
+    assert len(newS.events_db.getall()) == 1
+    e_db = newS.events_db.get("test event")
+    assert e_db
+    assert e_db[1] == str(e.date)
+    assert e_db[2] == e.name
+    assert e_db[3] == e.recurring
+    assert e_db[4] == e.frequency
   finally:
     os.remove(os.path.join(project_root,"databases","getEvents.db","server.db"))
     os.remove(os.path.join(project_root,"databases","getEvents.db","roster.db"))
@@ -626,27 +644,35 @@ def test_deleteEvent():
   d = datetime.datetime.now()
   rec = event.Event(d,"test event",True,"weekly")
   rec1 = event.Event(d+datetime.timedelta(0,60),"test event",True,"weekly")
+  rec1_id = hashlib.md5("{0}{1}".format(rec1.name,str(rec1.date)).encode("utf-8")).hexdigest()
   rec2 = event.Event(d+datetime.timedelta(0,60),"test event",False)
+  rec2_id = hashlib.md5("{0}{1}".format(rec2.name,str(rec2.date)).encode("utf-8")).hexdigest() 
   one = event.Raid(d,"second event",False)
+  one_id = hashlib.md5("{0}{1}".format(one.name,str(one.date)).encode("utf-8")).hexdigest()
 
   try:
     s.addEvent(rec)
     ## Delete only event
     s.deleteEvent(rec.name)
-    assert s.events == []
+    s.event_lock.acquire()
     assert len(s.events_db.getall()) == 0
+    s.event_lock.release()
     ## Delete one of multiple events
     ### a recurring event
     s.addEvent(rec)
     s.addEvent(one)
     s.deleteEvent(rec.name)
-    assert s.events == [one]
+    s.event_lock.acquire()
     assert len(s.events_db.getall()) == 1
+    assert s.events_db.get(one_id) == ["raid",str(one.date),one.name,one.recurring,one.frequency]
+    s.event_lock.release()
     ### a one-time event
     s.addEvent(rec)
     s.deleteEvent(one.name)
-    assert s.events == [rec]
+    s.event_lock.acquire()
     assert len(s.events_db.getall()) == 1
+    assert s.events_db.get(rec.name) == ["event",str(rec.date),rec.name,rec.recurring,rec.frequency]
+    s.event_lock.release()
     ## delete unknown event
     s.deleteEvent(rec.name)
     with pytest.raises(ValueError,match="Unknown Event"):
@@ -658,17 +684,28 @@ def test_deleteEvent():
       s.deleteEvent(rec.name,"one")
     ## delete unique event when multiple exist
     s.deleteEvent(rec1.name,"one",d.strftime("%d%b%Y").upper(),(d+datetime.timedelta(0,60)).strftime("%H:%M"))
-    assert rec1 not in s.events
-    assert rec in s.events
+    s.event_lock.acquire()
+    assert rec1_id not in s.events_db.getall()
+    assert rec.name in s.events_db.getall()
+    s.event_lock.release()
     ## delete all events
     s.addEvent(rec2)
-    print(list(map(lambda x: [x.name,str(x.date)],s.events)))
-    print(s.events_db.getall())
     s.deleteEvent(rec.name,"all")
-    assert rec1 not in s.events
-    assert rec not in s.events
+    s.event_lock.acquire()
+    assert rec1_id not in s.events_db.getall()
+    assert rec2_id not in s.events_db.getall()
+    assert rec.name not in s.events_db.getall()
+    s.event_lock.release()
 
   finally:
+    # release the lock
+    try:
+      s.event_lock.release()
+    except RuntimeError as e:
+      if str(e) != "release unlocked lock":
+        raise
+      else:
+        None
     os.remove(os.path.join(project_root,"databases","deleteEvent.db","server.db"))
     os.remove(os.path.join(project_root,"databases","deleteEvent.db","roster.db"))
     os.remove(os.path.join(project_root,"databases","deleteEvent.db","events.db"))
@@ -700,52 +737,81 @@ def test_setEvent():
   d2_date = d2 + datetime.timedelta(1)
   d2_time = d2_date + datetime.timedelta(0,60)
   e1 = event.Event(d,"test event",True,"weekly")
+  e1_id = hashlib.md5("{0}{1}".format(e1.name,str(e1.date)).encode("utf-8")).hexdigest()
   e2 = event.Event(d,"test event2",False)
+  e2_id = hashlib.md5("{0}{1}".format(e2.name,str(e2.date)).encode("utf-8")).hexdigest()
   e3 = event.Event(d2,"test event2",False)
+  e3_id = hashlib.md5("{0}{1}".format(e3.name,str(e3.date)).encode("utf-8")).hexdigest()
 
   # add event to the server
   s.addEvent(e1)
   s.addEvent(e2)
-  e1index = s.events.index(list(filter((lambda x: x.name == e1.name),s.events))[0])
-  e2index = s.events.index(list(filter((lambda x: x.name == e2.name),s.events))[0])
 
   try:
     # change one event
     ## Change the date of the event
     s.setEvent("one",e1.name,"date",d_date.date(),d)
-    assert s.events[e1index].name == e1.name
-    assert s.events[e1index].date == d_date
-    assert s.events[e1index].recurring == e1.recurring
-    assert s.events[e1index].frequency == e1.frequency
+    s.event_lock.acquire()
+    s.events_db._loaddb()
+    e_db = s.events_db.get(e1.name)
+    assert e_db
+    assert e_db[2] == e1.name
+    assert e_db[1] == str(d_date)
+    assert e_db[3] == e1.recurring
+    assert e_db[4] == e1.frequency
+    s.event_lock.release()
     ## Change the time of the event
     s.setEvent("one",e1.name,"time",d_time.time(),d_date)
-    assert s.events[e1index].name == e1.name
-    assert s.events[e1index].date == d_time
-    assert s.events[e1index].recurring == e1.recurring
-    assert s.events[e1index].frequency == e1.frequency
+    s.event_lock.acquire()
+    s.events_db._loaddb()
+    e_db = s.events_db.get(e1.name)
+    assert e_db
+    assert e_db[2] == e1.name
+    assert e_db[1] == str(d_time)
+    assert e_db[3] == e1.recurring
+    assert e_db[4] == e1.frequency
+    s.event_lock.release()
     ## change the name of the event
     s.setEvent("one",e1.name,"name","changed test event",d_time)
-    assert s.events[e1index].name == "changed test event"
-    assert s.events[e1index].date == d_time
-    assert s.events[e1index].recurring == e1.recurring
-    assert s.events[e1index].frequency == e1.frequency
+    s.event_lock.acquire()
+    s.events_db._loaddb()
+    e_db = s.events_db.get("changed test event")
+    assert e_db
+    assert e_db[2] == "changed test event"
+    assert e_db[1] == str(d_time)
+    assert e_db[3] == e1.recurring
+    assert e_db[4] == e1.frequency
+    s.event_lock.release()
     ## change the frequency of the event
     s.setEvent("one","changed test event","frequency","monthly",d_time)
-    assert s.events[e1index].name == "changed test event"
-    assert s.events[e1index].date == d_time
-    assert s.events[e1index].recurring == e1.recurring
-    assert s.events[e1index].frequency == e1.frequency
+    s.event_lock.acquire()
+    s.events_db._loaddb()
+    e_db = s.events_db.get("changed test event")
+    assert e_db
+    assert e_db[2] == "changed test event"
+    assert e_db[1] == str(d_time)
+    assert e_db[3] == e1.recurring
+    assert e_db[4] == "monthly"
+    s.event_lock.release()
     ## change the recurring status of the event
     s.setEvent("one","changed test event","recurring",False,d_time)
-    assert s.events[e1index].name == "changed test event"
-    assert s.events[e1index].date == d_time
-    assert s.events[e1index].recurring == False
-    assert s.events[e1index].frequency == None
+    e1_id = hashlib.md5("{0}{1}".format("changed test event",str(d_time)).encode("utf-8")).hexdigest()
+    s.event_lock.acquire()
+    s.events_db._loaddb()
+    e_db = s.events_db.get(e1_id)
+    assert e_db
+    assert e_db[2] == "changed test event"
+    assert e_db[1] == str(d_time)
+    assert e_db[3] == False
+    assert e_db[4] == None
     ## other events didnt change
-    assert s.events[e2index].name == e2.name
-    assert s.events[e2index].date == e2.date
-    assert s.events[e2index].recurring == e2.recurring
-    assert s.events[e2index].frequency == e2.frequency
+    e2_db = s.events_db.get(e2_id)
+    assert e2_db
+    assert e2_db[2] == e2.name
+    assert e2_db[1] == str(e2.date)
+    assert e2_db[3] == e2.recurring
+    assert e2_db[4] == e2.frequency
+    s.event_lock.release()
     ## throw errors
     ### tried to change frequency but event is not recurring
     with pytest.raises(ValueError,match="Cannot change frequency for one-time event"):
@@ -755,45 +821,72 @@ def test_setEvent():
     with pytest.raises(ValueError,match="Operation type \'one\' must have a unique name OR inputs for \'date\' and \'time\'"):
       s.setEvent("one","test event2","recurring",True)
     # change all events
-    e3index = s.events.index(list(filter((lambda x: x.name == e3.name and x.date == e3.date),s.events))[0])
     ## Change the date of the events
     s.setEvent("all",e2.name,"date",d2_date.date())
-    assert s.events[e2index].name == e2.name
-    assert s.events[e2index].date == d2_date-datetime.timedelta(0,120)
-    assert s.events[e2index].recurring == e2.recurring
-    assert s.events[e2index].frequency == e2.frequency
-    assert s.events[e3index].name == e3.name
-    assert s.events[e3index].date == d2_date
-    assert s.events[e3index].recurring == e3.recurring
-    assert s.events[e3index].frequency == e3.frequency
+    e2_id = hashlib.md5("{0}{1}".format("test event2",str(d+datetime.timedelta(3))).encode("utf-8")).hexdigest()
+    e3_id = hashlib.md5("{0}{1}".format("test event2",str(d2+datetime.timedelta(1))).encode("utf-8")).hexdigest()
+    s.event_lock.acquire()
+    s.events_db._loaddb()
+    e2_db = s.events_db.get(e2_id)
+    assert e2_db
+    assert e2_db[2] == e2.name
+    assert e2_db[1] == str(d+datetime.timedelta(3))
+    assert e2_db[3] == e2.recurring
+    assert e2_db[4] == e2.frequency
+    e3_db = s.events_db.get(e3_id)
+    assert e3_db
+    assert e3_db[2] == e3.name
+    assert e3_db[1] == str(d2+datetime.timedelta(1))
+    assert e3_db[3] == e3.recurring
+    assert e3_db[4] == e3.frequency
+    s.event_lock.release()
     ## reset for next battery
-    s.setEvent("one",e2.name,"date",d,s.events[e2index].date)
+    s.setEvent("one",e2.name,"date",d,d+datetime.timedelta(3))
     ## Change the time of the events
     s.setEvent("all",e2.name,"time",d2_time.time())
-    assert s.events[e2index].name == e2.name
-    assert s.events[e2index].date == d2_time-datetime.timedelta(3,0)
-    assert s.events[e2index].recurring == e2.recurring
-    assert s.events[e2index].frequency == e2.frequency
-    assert s.events[e3index].name == e3.name
-    assert s.events[e3index].date == d2_time
-    assert s.events[e3index].recurring == e3.recurring
-    assert s.events[e3index].frequency == e3.frequency
+    e2_id = hashlib.md5("{0}{1}".format(e2.name,str(d+datetime.timedelta(0,180))).encode("utf-8")).hexdigest()
+    e3_id = hashlib.md5("{0}{1}".format(e3.name,str(d2+datetime.timedelta(1,60))).encode("utf-8")).hexdigest()
+    s.event_lock.acquire()
+    s.events_db._loaddb()
+    e2_db = s.events_db.get(e2_id)
+    assert e2_db
+    assert e2_db[2] == e2.name
+    assert e2_db[1] == str(d+datetime.timedelta(0,180))
+    assert e2_db[3] == e2.recurring
+    assert e2_db[4] == e2.frequency
+    e3_db = s.events_db.get(e3_id)
+    assert e3_db
+    assert e3_db[2] == e3.name
+    assert e3_db[1] == str(d2+datetime.timedelta(1,60))
+    assert e3_db[3] == e3.recurring
+    assert e3_db[4] == e3.frequency
+    s.event_lock.release()
     ## change the name of the events
     s.setEvent("all",e2.name,"name","changed "+e2.name)
-    assert s.events[e2index].name == "changed test event2"
-    assert s.events[e2index].date == d2_time-datetime.timedelta(3)
-    assert s.events[e2index].recurring == e2.recurring
-    assert s.events[e2index].frequency == e2.frequency
-    assert s.events[e3index].name == "changed test event2"
-    assert s.events[e3index].date == d2_time
-    assert s.events[e3index].recurring == e3.recurring
-    assert s.events[e3index].frequency == e3.frequency
-
+    e2_id = hashlib.md5("{0}{1}".format("changed test event2",str(d+datetime.timedelta(0,180))).encode("utf-8")).hexdigest()
+    e3_id = hashlib.md5("{0}{1}".format("changed test event2",str(d+datetime.timedelta(3,180))).encode("utf-8")).hexdigest()
+    s.event_lock.acquire()
+    s.events_db._loaddb()
+    e2_db = s.events_db.get(e2_id)
+    assert e2_db
+    assert e2_db[2] == "changed test event2"
+    assert e2_db[1] == str(d+datetime.timedelta(0,180))
+    assert e2_db[3] == e2.recurring
+    assert e2_db[4] == e2.frequency
+    e3_db = s.events_db.get(e3_id)
+    assert e3_db
+    assert e3_db[2] == "changed test event2"
+    assert e3_db[1] == str(d+datetime.timedelta(3,180))
+    assert e3_db[3] == e3.recurring
+    assert e3_db[4] == e3.frequency
     ## other event didnt change
-    assert s.events[e1index].name == "changed test event"
-    assert s.events[e1index].date == d_time
-    assert s.events[e1index].recurring == False
-    assert s.events[e1index].frequency == None
+    e_db = s.events_db.get(e1_id)
+    assert e_db
+    assert e_db[2] == "changed test event"
+    assert e_db[1] == str(d_time)
+    assert e_db[3] == False
+    assert e_db[4] == None
+    s.event_lock.release()
     ## throw errors
     ### cannot change recurring of all events
     with pytest.raises(ValueError,match="Operation \'all\' cannot be used to change event \'recurring\' status"):
@@ -807,33 +900,17 @@ def test_setEvent():
       s.setEvent("one","bad name","date",d_date.date(),d)
     ## by time
     with pytest.raises(ValueError,match="Matching event found with incorrect inputs \'date\' or \'time\'"):
-      s.setEvent("one",e1.name,"date",d_date.date(),d-datetime.timedelta(4))
-
-    ## Last up, check the events in the database
-    e1_id = hashlib.md5("{0}{1}".format(e1.name,str(e1.date)).encode("utf-8")).hexdigest()
-    e2_id = hashlib.md5("{0}{1}".format(e2.name,str(e2.date)).encode("utf-8")).hexdigest()
-    e3_id = hashlib.md5("{0}{1}".format(e3.name,str(e3.date)).encode("utf-8")).hexdigest()
-    e1db = s.events_db.get(e1_id)
-    assert e1db
-    e2db = s.events_db.get(e2_id)
-    assert e2db
-    e3db = s.events_db.get(e3_id)
-    assert e3db
-    assert len(s.events_db.getall()) == 3
-    assert e1db[1] == str(e1.date)
-    assert e1db[2] == e1.name
-    assert e1db[3] == e1.recurring
-    assert e1db[4] == e1.frequency
-    assert e2db[1] == str(e2.date)
-    assert e2db[2] == e2.name
-    assert e2db[3] == e2.recurring
-    assert e2db[4] == e2.frequency
-    assert e3db[1] == str(d2_time)
-    assert e3db[2] == e3.name
-    assert e3db[3] == e3.recurring
-    assert e3db[4] == e3.frequency
+      s.setEvent("one","changed test event","date",d_date.date(),d+datetime.timedelta(4))
 
   finally:
+    # release the lock
+    try:
+      s.event_lock.release()
+    except RuntimeError as e:
+      if str(e) != "release unlocked lock":
+        raise
+      else:
+        None
     os.remove(os.path.join(project_root,"databases","setEvent.db","server.db"))
     os.remove(os.path.join(project_root,"databases","setEvent.db","roster.db"))
     os.remove(os.path.join(project_root,"databases","setEvent.db","events.db"))

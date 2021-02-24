@@ -15,7 +15,7 @@ project_root = os.path.dirname(__file__)
 sys.path.append(os.path.join(project_root,"classes"))
 
 # Import subpackages
-import server
+import server, timekeeper
 from event import *
 from player import *
 
@@ -62,7 +62,10 @@ async def on_ready():
       print("\tRoles: RAIDER/"+server.Raider.name,"SOCIAL/"+server.Social.name,"MEMBER/"+server.Member.name,"PUG/"+server.PUG.name)
     except AttributeError:
       print("No mapped roles")
-  # TODO - spin off new thread to handle command line args from the bot side
+    server.timekeeper = timekeeper.TimeKeeper(server.id,server.name,server.db_path,server.exitFlag,server.event_lock)
+    server.timekeeper.start()
+
+    ## TODO - shell thread for gracefully closing all of the timekeepers
 
 @client.command(name="hello",help="Prints 'Hello World!'")
 async def helloWorld(context):
@@ -79,13 +82,17 @@ async def show(context,opt: str):
     await context.trigger_typing()
     await context.send("\n".join(roster))
   elif opt == "events":
+    server.event_lock.acquire()
+    server.events_db._loaddb()
     events = []
-    for event in server.events:
-      events.append("Type: "+("raid" if isinstance(event,Raid) else "event" if isinstance(event,Event) else "ERROR")+"\tName: "+event.name+"\tDate: "+str(event.date))
+    for key in server.events_db.getall():
+      e = server.events_db.get(key)
+      events.append("Type: "+e[0]+"\tName: "+e[2]+"\tDate: "+e[1])
     if len(events) > 0:
       await context.send("\n".join(events))
     else:
       await context.send("No events currently scheduled for this server")
+    server.event_lock.release()
   else:
     await context.send_help(context.command)
 
@@ -353,4 +360,12 @@ async def on_command_error(context,error):
 # Call the client run method of the previously created discord client, using the value of the TOKEN key in the current directory's environment file, .env
 load_dotenv()
 TOKEN = os.getenv('TOKEN')
-client.run(TOKEN)
+try:
+  client.run("ODAzNjc0MTI2NjkwMTU2NTU1.YBBN2w.wep0uNrCnmU4RwEnNXt9gpKQPkw")
+except KeyboardInterrupt:
+  print("Commencing shutdown...")
+  client.logout()
+  for server in client.servers:
+    server.exitFlag.set()
+    server.timekeeper.join()
+  print("Shutdown complete")
