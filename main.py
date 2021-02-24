@@ -347,6 +347,8 @@ async def update(context,component):
     raise ValueError("Unknown component")
   await context.send("Update complete, issue \'!show roster\' to check")
 
+@client.command(name="control",help="Control the bot\nUsage:\n!control <restart|shutdown>")
+
 @client.event
 async def on_command_error(context,error):
   if isinstance(error,discord.ext.commands.errors.CheckFailure):
@@ -360,12 +362,10 @@ async def on_command_error(context,error):
 # Call the client run method of the previously created discord client, using the value of the TOKEN key in the current directory's environment file, .env
 load_dotenv()
 TOKEN = os.getenv('TOKEN')
-try:
-  client.run("ODAzNjc0MTI2NjkwMTU2NTU1.YBBN2w.wep0uNrCnmU4RwEnNXt9gpKQPkw")
-except KeyboardInterrupt:
-  print("Commencing shutdown...")
-  client.logout()
-  for server in client.servers:
-    server.exitFlag.set()
-    server.timekeeper.join()
-  print("Shutdown complete")
+client.run("ODAzNjc0MTI2NjkwMTU2NTU1.YBBN2w.Px432Vyd-KyW0-1BdEnZATnlksQ")
+
+print("Commencing shutdown...")
+for server in client.servers:
+  server.exitFlag.set()
+  server.timekeeper.join()
+print("Shutdown complete")
