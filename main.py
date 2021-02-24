@@ -362,7 +362,7 @@ async def on_command_error(context,error):
 # Call the client run method of the previously created discord client, using the value of the TOKEN key in the current directory's environment file, .env
 load_dotenv()
 TOKEN = os.getenv('TOKEN')
-client.run("ODAzNjc0MTI2NjkwMTU2NTU1.YBBN2w.Px432Vyd-KyW0-1BdEnZATnlksQ")
+client.run(TOKEN)
 
 print("Commencing shutdown...")
 for server in client.servers:
