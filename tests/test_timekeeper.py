@@ -1,5 +1,5 @@
 # Test-Driven Development for the TimeKeeper class
-import pytest, sys, os, re, datetime, time, threading, hashlib, pickledb
+import pytest, sys, os, re, datetime, time, threading, hashlib, pickledb, logging
 project_root = os.path.split(os.path.dirname(__file__))[0]
 sys.path.append(os.path.join(project_root,"classes"))
 
@@ -106,13 +106,13 @@ def test_keepTime():
   ### use the threading module to track the exit flag and lock for the db, defaults to UNSET/FALSE
   exitFlag = threading.Event()
   db_lock = threading.Lock()
-  t = timekeeper.TimeKeeper(s.id,s.name,s.db_path,exitFlag,db_lock)
+  t = timekeeper.TimeKeeper(s.id,s.name,s.db_path,exitFlag,db_lock,test_mode = True)
 
   try:
     # run the thread
     t.start()
-    # guarantee it will run for 5 seconds
-    time.sleep(5)
+    # guarantee it will run for 2 seconds
+    time.sleep(2)
     # signal the thread to stop
     exitFlag.set()
     # wait for thread to stop

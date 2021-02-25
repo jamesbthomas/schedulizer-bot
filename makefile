@@ -10,5 +10,8 @@ all: install test
 run: install
 	python3 main.py
 
+debug: install
+	python3 main.py level=debug
+
 clean: install
 	python3 -m pip uninstall discord pytest pickledb dotenv > /dev/null

@@ -1,6 +1,6 @@
 # Defines the Server class and extends the Discord.Client class to track it
 
-import discord, pickledb, os, player, event, datetime, hashlib, threading
+import discord, pickledb, sys, os, player, event, datetime, hashlib, threading, logging, logging.handlers
 from discord.ext import commands
 
 class Server(object):
@@ -231,6 +231,10 @@ class Server(object):
       return
     
     def __init__(self,id,name,owner):
+        # Generate a child logger of the root for this server
+        self.logger = logging.getLogger("schedulizer.{0}".format(name))
+        self.logger.info("Creating new server for {0}".format(name))
+
         self.id = id
         self.name = name
         self.owner = owner
@@ -244,13 +248,15 @@ class Server(object):
         self.server_lock = threading.Lock()
         self.event_lock = threading.Lock()
         # Create the database file for this server
-
         project_root = os.path.split(os.path.dirname(__file__))[0]
         try:
+          self.logger.info("Creating directory for server databases")
           os.makedirs(os.path.join(project_root,"databases",str(id)+".db"))
         except FileExistsError:
+          self.logger.debug("Server directory exists, this must be a known server")
           None
         self.db_path = os.path.join(project_root,"databases",str(id)+".db")
+        self.logger.debug("Creating database for the server object")
         self.db = pickledb.load(os.path.join(self.db_path,"server.db"), False,sig=False)
         self.db.set('id',id)
         self.db.set('name',name)
@@ -260,20 +266,18 @@ class Server(object):
         self.Member = self.db.get("Member") or None
         self.PUG = self.db.get("PUG") or None
         self.db.dump()
-
         # Create the database file for this server's roster
-
+        self.logger.debug("Creating database for the roster")
         self.roster_db = pickledb.load(os.path.join(self.db_path,"roster.db"),False,sig=False)
         self.roster_db.dump()
-
         # Setup event tracking for this server
         ## create the database for this server's events
-
+        self.logger.debug("Creating database for the events")
         self.events_db = pickledb.load(os.path.join(self.db_path,"events.db"),False,sig=False)
         self.events_db.dump()
-
         # create the timekeeper slot
         self.timekeeper = None
+        self.logger.info("Server object creation complete")
 
 class SchedClient(commands.Bot):
 

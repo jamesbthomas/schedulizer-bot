@@ -10,6 +10,8 @@ import re
 import datetime
 # Required for reading the auth token from the environment file (not included in git repo)
 from dotenv import load_dotenv
+# Required to handle logging on the script side
+import logging, logging.handlers
 # Add project_root to the path so we can import from subpackages
 project_root = os.path.dirname(__file__)
 sys.path.append(os.path.join(project_root,"classes"))
@@ -19,12 +21,107 @@ import server, timekeeper
 from event import *
 from player import *
 
+client = None
+
+# wrap the logger setup in a function so that the messaging shows up the way I want it to in the log file
+def setup(client):
+  # setup the logging module
+  ## default log level is INFO
+  log_level = logging.INFO
+  log_level_str = "INFO"
+  ## check for command line arguments like setting the logging level
+  if __name__ == "__main__":
+    if len(sys.argv) > 1:
+      # iterate through arguments, build out the attributes we need to use later
+      for arg in sys.argv[1:]:
+        # switch based on known arguments
+        ## Start with all of the help based ones
+        if arg == "-h":
+          print("usage: python3 main.py [level=logging_level]")
+          exit()
+        elif arg == "--help":
+          print("usage: python3 main.py [level=logging_level]")
+          exit()
+        elif arg == "help":
+          print("usage: python3 main.py [level=logging_level]")
+          exit()
+        # catch arguments using the key=value format
+        elif re.match("\w+=\w+",arg):
+          key, value = arg.split('=')
+          # check for known keywords and act appropriately
+          ## keyword == "level"
+          if key == "level":
+            if value.upper() == "DEBUG":
+              print("INFO - startup - schedulizer - Setting log level to DEBUG")
+              log_level = logging.DEBUG
+              log_level_str = "DEBUG"
+            elif value.upper() == "INFO":
+              print("INFO - startup - schedulizer - Setting log level to INFO (default)")
+              log_level = logging.INFO
+              log_level_str = "INFO"
+            elif value.upper() == "WARNING":
+              print("WARNING - startup - schedulizer - Setting log level to WARNING (default is INFO)")
+              log_level = logging.WARNING
+              log_level_str = "WARNING"
+            elif value.upper() == "ERROR":
+              print("WARNING - startup - schedulizer - Setting log level to ERROR (default is INFO)")
+              log_level = logging.ERROR
+              log_level_str = "ERROR"
+            elif value.upper() == "CRITICAL":
+              print("WARNING - startup - schedulizer - Setting log level to CRITICAL (default is INFO)")
+              log_level = logging.CRITICAL
+              log_level_str = "CRITICAL"
+            else:
+              print("WARNING - startup - schedulizer - Unrecognized value \'{0}\', log level will be set to {1}".format(value,log_level))
+          # unrecognized keyword
+          else:
+            print("ERROR - startup - schedulizer - Unrecognized Keyword \'{0}\'".format(key))
+            print("usage: python3 main.py [level=logging_level]")
+            exit()
+        else:
+          print("ERROR - startup - schedulizer - Unrecognized Argument \'{0}\'".format(arg))
+          print("usage: python3 main.py [level=logging_level]")
+          exit()
+    else:
+      # no arguments provided
+      None
+  # create the Logger object
+  main_logger = logging.getLogger("schedulizer")
+  ## create the handlers for the log file and the console
+  ### active filename = project_root\logs\schedulizer.log
+  ### rolled filename(s) = project_root\logs\schedullizer.log.%Y-%m-%d_%H-%M-%S
+  ### rollover interval = every Tuesday, keep 10 log files
+  file_handler = logging.handlers.TimedRotatingFileHandler(os.path.join(project_root,"logs","{0}.log".format("schedulizer")),when='W1',backupCount=10)
+  console_handler = logging.StreamHandler()
+  ## set the log level
+  file_handler.setLevel(log_level)
+  console_handler.setLevel(log_level)
+  main_logger.setLevel(log_level)
+  ## set the format for messages
+  ### format: <timestamp>: <log_level> - <component hierarchy> - <function name> - <message>
+  #### to reduce the number of times we need to create/recreate the logger, the MESSAGE passed as input will include the component issuing the log message
+  format = logging.Formatter("%(asctime)s: %(levelname)-8s - %(name)s - %(funcName)s - %(message)s")
+  file_handler.setFormatter(format)
+  console_handler.setFormatter(format)
+  ## add completed handlers to the logger
+  main_logger.addHandler(file_handler)
+  main_logger.addHandler(console_handler)
+
+  # log the startup
+  main_logger.info("Start up initiated with log level {0}".format(log_level_str))
+
+  main_logger.info("Setting up known servers...")
+  client.setup()
+  main_logger.info("Known server setup complete")
+
+  return main_logger
+
 # Build the Intents object for the client
 intents = discord.Intents.default()
 intents.members = True
 # Create an instance of the schedClient
 client = server.SchedClient(intents=intents,command_prefix='!')
-client.setup()
+main_logger = setup(client)
 
 # Asynchronous function calls inherited from the client class (i think)
 # when the client class runs (using the token to authenticate) it sends events back to the bot like on_ready and on_message
@@ -34,38 +131,55 @@ client.setup()
 # TODO add some more verbose logging maybe?
 @client.event
 async def on_ready():
-  print('Logged on as: {0.user}'.format(client))
-  print('Connected to ' + str(len(client.guilds)) + " servers")
+  main_logger.info('Logged on as: {0.user}'.format(client))
+  main_logger.info('Connected to ' + str(len(client.guilds)) + " servers")
+  main_logger.debug("Processing connected servers...")
   for guild in client.guilds:
     if guild.id not in client.server_ids:
-      print("NEW\t\t-\tName: ",guild.name,";\tID: ",guild.id,";\tOwner: ",guild.owner)
+      main_logger.info("NEW SERVER Name: {0};ID: {1};Owner: {2}".format(guild.name,guild.id,guild.owner))
       server = client.addServer(guild.id,guild.name,guild.owner)
       # Identify Role objects for schedulizer-based roles
+      main_logger.info("Processing roles for server {0}...".format(server.name))
       server.mapRole(discord.utils.find(lambda r: r.name == "Raider",guild.roles),"Raider")
+      main_logger.debug("Mapped RAIDER schedule to Role {0}".format(server.Raider))
       server.mapRole(discord.utils.find(lambda r: r.name == "Social",guild.roles),"Social")
+      main_logger.debug("Mapped SOCIAL schedule to role {0}".format(server.Social))
       server.mapRole(discord.utils.find(lambda r: r.name == "Member",guild.roles),"Member")
+      main_logger.debug("Mapped MEMBER schedule to role {0}".format(server.Member))
       server.mapRole(discord.utils.find(lambda r: r.name == "Pug",guild.roles),"PUG")
+      main_logger.debug("Mapped PUG schedule to role {0}".format(server.PUG))
+      main_logger.info("Completed processing roles for server {0}".format(server.name))
       # Create user objects for each player with a valid schedule role
+      main_logger.info("Processing members for {0}...".format(server.name))
       for member in guild.members:
         try:
           p = Player(member.name,sched=discord.utils.find(lambda r: r == server.Raider or r == server.Social or r == server.Member or r == server.PUG,member.roles).name)
           server.updateRoster(p)
+          main_logger.debug("Created Player Object: Name:{0};Schedule:{1};Roles:{2}".format(p.name,p.sched,p.roles))
         except AttributeError:
           continue
+      main_logger.info("Completed processing members for {0}".format(server.name))
+      main_logger.info("New server setup complete for {0}".format(server.name))
     else:
-      print("KNOWN\t-\tName: ",guild.name,";\tID: ",guild.id,";\tOwner: ",guild.owner)
+      main_logger.info("KNOWN SERVER Name: {0};ID: {1};Owner: {2}".format(guild.name,guild.id,guild.owner))
       server = client.servers[client.server_ids.index(guild.id)]
+      main_logger.info("Getting roles from database for {0}...".format(server.name))
       server.getRoles(guild.roles)
+      main_logger.info("Getting roster from database for {0}...".format(server.name))
       server.getRoster()
+      main_logger.info("Getting events from database for {0}...".format(server.name))
       server.getEvents()
+      main_logger.info("Known server setup complete for {0}".format(server.name))
     try:
-      print("\tRoles: RAIDER/"+server.Raider.name,"SOCIAL/"+server.Social.name,"MEMBER/"+server.Member.name,"PUG/"+server.PUG.name)
+      main_logger.info("Roles for {0}: RAIDER/{1},SOCIAL/{2},MEMBER/{3},PUG/{4}".format(server.name,server.Raider.name,server.Social.name,server.Member.name,server.PUG.name))
     except AttributeError:
-      print("No mapped roles")
+      main_logger.info("No mapped roles for {0}".format(server.name))
+    main_logger.info("Setting up timekeeper for {0}".format(server.name))
     server.timekeeper = timekeeper.TimeKeeper(server.id,server.name,server.db_path,server.exitFlag,server.event_lock)
     server.timekeeper.start()
-
-    ## TODO - shell thread for gracefully closing all of the timekeepers
+    main_logger.info("Timekeeper for {0} started".format(server.name))
+    main_logger.info("Initialization for {0} complete".format(server.name))
+  main_logger.info("Schedulizer initialization complete")
 
 @client.command(name="hello",help="Prints 'Hello World!'")
 async def helloWorld(context):
@@ -218,6 +332,7 @@ async def event(context, *args):
         elif len(remainder) == 4:
           min, period = remainder[0:2],remainder[2:4]
         else: #unrecognized time format
+          ## TODO - log this error
           raise RuntimeError("Time Split Failure")
         min = int(min)
         hour = int(hour)
@@ -268,11 +383,14 @@ async def event(context, *args):
     message = ""
     if result:
       message = "Successfully added event {0}".format(e.name)
+      ## TODO - log successful event creation
     else:
       message = "WARNING: Unable to add event"
+      ## TODO - log this error
   elif operation == "delete":
     server.deleteEvent(name,type,date,time)
     message = "Successfully deleted {0} instance(s) of event {1}".format(type,name)
+    # TODO - log event deletion
   elif operation == "set":
     if property == "date":
       value = datetime.datetime.strptime(value,"%d%b%Y")
@@ -283,6 +401,7 @@ async def event(context, *args):
     else:
       server.setEvent(type,name,property,value)
     message = "Successfully changed property {0} of event {1} to {2}".format(property,name,value)
+    # TODO - log event change
   await context.send(message)
 
 @client.command(name="player",help="Manipulate Player objects.\nUsage:\n!player set <name> <property> <val>\n!player show <name>\nNote: To set multiple roles for a player, use the following syntax: !player set <name> roles <first Role>,<second Role>")
@@ -331,6 +450,7 @@ async def player(context, *args):
     #await context.send("STUB SET\tname: {1};property: {2};value: {3}".format(operation,name,property,value))
     await context.send("Changed property {0} of player {1} to {2}".format(property,name,str(value)))
   else:
+    # TODO - log internal error
     raise RuntimeError("Unknown operation")
 
 @client.command(name="update",help="Force the server to rebuild certain components\nUsage:\t!update <component>\nAvailable Components: roster")
@@ -345,6 +465,7 @@ async def update(context,component):
         continue
   else:
     raise ValueError("Unknown component")
+  # TODO - log the request to update the roster
   await context.send("Update complete, issue \'!show roster\' to check")
 
 @client.command(name="control",help="Control the bot\nUsage:\n!control <restart|shutdown>")
@@ -352,6 +473,7 @@ async def update(context,component):
 @client.event
 async def on_command_error(context,error):
   if isinstance(error,discord.ext.commands.errors.CheckFailure):
+    main_logger.warning("User {0}/{1} attempted to issue command {2}".format(context.user,context.guild.name,context.message))
     await context.send('You do not have the correct role for this command.')
   elif isinstance(error,discord.ext.commands.errors.MissingRequiredArgument):
     await context.send_help(context.command)
@@ -364,8 +486,16 @@ load_dotenv()
 TOKEN = os.getenv('TOKEN')
 client.run(TOKEN)
 
-print("Commencing shutdown...")
-for server in client.servers:
-  server.exitFlag.set()
-  server.timekeeper.join()
-print("Shutdown complete")
+# another wrapper so that my logs will be pretty
+def shutdown(client):
+  main_logger.info("Commencing shutdown...")
+  for server in client.servers:
+    main_logger.info("Shutting down {0}".format(server.name))
+    server.exitFlag.set()
+    main_logger.debug("Waiting for timekeeper to close on server {0}...".format(server.name))
+    server.timekeeper.join()
+    main_logger.debug("TimeKeeper closed for server {0}".format(server.name))
+    main_logger.info("Server {0} shutdown complete".format(server.name))
+  main_logger.info("Shutdown complete")
+
+shutdown(client)

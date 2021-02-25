@@ -1,6 +1,6 @@
 # Test-Driven Development for the Server class
 
-import pytest, sys, os, pickledb, datetime, hashlib
+import pytest, sys, os, pickledb, datetime, hashlib, logging
 project_root = os.path.split(os.path.dirname(__file__))[0]
 print(project_root)
 sys.path.append(os.path.join(project_root,"classes"))
@@ -60,40 +60,54 @@ def test_addServer():
     client = server.SchedClient(command_prefix='!')
     
     # Add first server
-    client.addServer(
+    s1 = client.addServer(
         id = "test1",
         name = "name for test",
         owner = "ServerOwner#1"
     )
     
     # Add second server
-    client.addServer(
+    s2 = client.addServer(
         id = "test2",
         name = "name for second",
         owner = "ServerOwner#2"
     )
     try:
+      assert s1.id == "test1"
+      assert s1.name == "name for test"
+      assert s1.owner == "ServerOwner#1"
       assert client.servers[0].id == "test1"
       assert client.servers[0].name == "name for test"
       assert client.servers[0].owner == "ServerOwner#1"
+      assert s2.id == "test2"
+      assert s2.name == "name for second"
+      assert s2.owner == "ServerOwner#2"
       assert client.servers[1].id == "test2"
       assert client.servers[1].name == "name for second"
       assert client.servers[1].owner == "ServerOwner#2"
       
       # Add server with same id (should raise exception)
-
       with pytest.raises(FileExistsError,match="Server already known"):
           client.addServer(id = "test1",name = "third test",owner = "Owner")
 
       # Check for database creation
+      assert s1.db_path == os.path.join(project_root,"databases","test1.db")
+      assert s1.db.get('owner') == "ServerOwner#1"
+      assert s1.db.get('id') == "test1"
+      assert s1.db.get('name') == "name for test"
       assert client.servers[0].db_path == os.path.join(project_root,"databases","test1.db")
       assert client.servers[0].db.get('owner') == "ServerOwner#1"
       assert client.servers[0].db.get('id') == "test1"
       assert client.servers[0].db.get('name') == "name for test"
+      assert s2.db_path == os.path.join(project_root,"databases","test2.db")
+      assert s2.db.get('owner') == "ServerOwner#2"
+      assert s2.db.get('id') == "test2"
+      assert s2.db.get('name') == "name for second"
       assert client.servers[1].db_path == os.path.join(project_root,"databases","test2.db")
       assert client.servers[1].db.get('owner') == "ServerOwner#2"
       assert client.servers[1].db.get('id') == "test2"
       assert client.servers[1].db.get('name') == "name for second"
+
     finally:
       # clear out DBs from this test
       os.remove(os.path.join(project_root,"databases","test2.db",'server.db'))
@@ -638,7 +652,7 @@ def test_deleteEvent():
   s = client.addServer(
     id = "deleteEvent",
     name = "Server for deleteEvent test",
-    owner = "TestOwner"
+    owner = "TestOwner",
   )
   # create an event
   d = datetime.datetime.now()
