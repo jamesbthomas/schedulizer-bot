@@ -128,7 +128,6 @@ main_logger = setup(client)
 #@client.event signifies the following function as based on the results of a client event
 
 # Actions to take after the client successfully authenticates and reports the ready status
-# TODO add some more verbose logging maybe?
 @client.event
 async def on_ready():
   main_logger.info('Logged on as: {0.user}'.format(client))
@@ -181,11 +180,26 @@ async def on_ready():
     main_logger.info("Initialization for {0} complete".format(server.name))
   main_logger.info("Schedulizer initialization complete")
 
+@client.event
+async def on_command(context):
+  # run this parent function whenever a command is received
+  main_logger.info("Received command; Server: {0}; Channel: {1}; Message: {2}; User: {3}".format(context.guild.name,context.channel,context.message.content,context.author))
+
+@client.event
+async def on_command_completion(context):
+  # run this parent function whenever a command completes
+  status = "ERROR"
+  if context.command_failed:
+    status = "FAIL"
+  else:
+    status = "SUCCESS"
+  main_logger.info("Command complete, status {0}; Server: {1}; Channel: {2}; Message: {3}; User: {4}".format(status,context.guild.name,context.channel,context.message.content,context.author))
+  
 @client.command(name="hello",help="Prints 'Hello World!'")
 async def helloWorld(context):
   await context.send("Hello World!")
 
-@client.command(name="show",help="Displays different information.\nUsage: !show [roster|events]\nNote: !show roster only shows players with on the Raider or Social schedule. To see other players use !player show <name>")
+@client.command(name="show",help="Displays different information.\nUsage: !show [roster|events]\nNote: !show roster only shows players on the Raider or Social schedule. To see other players use !player show <name>")
 async def show(context,opt: str):
   server = client.servers[client.server_ids.index(context.guild.id)]
   if opt == "roster":
@@ -468,8 +482,6 @@ async def update(context,component):
   # TODO - log the request to update the roster
   await context.send("Update complete, issue \'!show roster\' to check")
 
-@client.command(name="control",help="Control the bot\nUsage:\n!control <restart|shutdown>")
-
 @client.event
 async def on_command_error(context,error):
   if isinstance(error,discord.ext.commands.errors.CheckFailure):
@@ -477,6 +489,9 @@ async def on_command_error(context,error):
     await context.send('You do not have the correct role for this command.')
   elif isinstance(error,discord.ext.commands.errors.MissingRequiredArgument):
     await context.send_help(context.command)
+  elif isinstance(error,discord.ext.commands.errors.CommandNotFound):
+    await context.send("Unrecognized command")
+    await context.send_help()
   else:
     await context.send(":".join(str(error).split(":")[1:]))
     await context.send_help(context.command)
@@ -484,7 +499,7 @@ async def on_command_error(context,error):
 # Call the client run method of the previously created discord client, using the value of the TOKEN key in the current directory's environment file, .env
 load_dotenv()
 TOKEN = os.getenv('TOKEN')
-client.run(TOKEN)
+client.run("ODAzNjc0MTI2NjkwMTU2NTU1.YBBN2w.KhfB1kwGoiXG5mz6TcFQ5Ufe0mc")
 
 # another wrapper so that my logs will be pretty
 def shutdown(client):

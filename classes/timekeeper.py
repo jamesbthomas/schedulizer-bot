@@ -79,11 +79,11 @@ def keepTime(exitFlag,db_path,db_lock,logger,name, test_mode = False):
           raise RuntimeError("Date comparison failed")
       # dump the database
       db.dump()
-      # sleep so that this thing doesnt just spin endlessly forever
-      if not test_mode:
-        logger.debug("Sleeping...")
-        time.sleep(30)
     finally:
       # release the lock
       db_lock.release()
+    # sleep so that this thing doesnt just spin endlessly forever
+    if not test_mode and not exitFlag.isSet():
+      logger.debug("Sleeping...")
+      time.sleep(30)
   return
