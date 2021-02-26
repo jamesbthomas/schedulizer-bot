@@ -236,10 +236,12 @@ class Server(object):
       self.updateRoster(player)
 
     def mapRole(self,role,sched):
-      self.logger.info("Mapping role {0} to schedule {1}".format(role.id,sched))
       if role == None:
         return
-      elif sched == "Raider":
+      else:
+        self.logger.info("Mapping role {0} to schedule {1}".format(role.id,sched))
+
+      if sched == "Raider":
         self.Raider = role
         self.db.set("Raider",role.id)
       elif sched == "Social":

@@ -486,7 +486,6 @@ async def update(context,component):
         continue
   else:
     raise ValueError("Unknown component")
-  # TODO - log the request to update the roster
   await context.send("Update complete, issue \'!show roster\' to check")
 
 @client.event
