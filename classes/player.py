@@ -14,7 +14,7 @@ class Player(object):
     try:
       return "Name: "+self.name+"; Sched: "+self.sched+"; Roles: "+" > ".join(self.roles)
     except:
-      return "Name: "+self.name+"; Sched: "+self.sched+"; Roles: N/A"
+      return "Name: {0}; Sched: {1}; Roles: {2}".format(self.name,self.sched,self.roles)
 
   def __init__(self,name,sched=None,roles=None):
     self.name = name

@@ -596,6 +596,7 @@ def test_getEvents():
   GIVEN correctly constructed SchedClient, and a Server object with existing events in the database
   WHEN the SchedClient sets up
   THEN read in the database, create event objects, and store them in the appropriate Server attribute
+  NOTE: there was previously a method named Server.getEvents(), but it was phased out when the database became the primary storage mechanism. This test is still valid, however, to show that events are properly preserved between restarts of the SchedClient
   """
 
   # Create the client
@@ -620,7 +621,6 @@ def test_getEvents():
   try:
     newS = newClient.servers[newClient.server_ids.index("getEvents")]
     # run the function
-    newS.getEvents()
     assert len(newS.events_db.getall()) == 1
     e_db = newS.events_db.get("test event")
     assert e_db

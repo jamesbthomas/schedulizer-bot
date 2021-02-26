@@ -7,6 +7,7 @@ class Server(object):
     # Class for tracking properties by server
 
     def addEvent(self,e):
+      self.logger.info("Adding event {0} on {1}...".format(e.name,str(e.date)))
       ## do some light error checking
       if isinstance(e,event.Raid):
         t = "raid"
@@ -15,15 +16,19 @@ class Server(object):
       else:
         raise TypeError("Input must be a propertly constructed Event or Raid object")
       ## make sure the db is up to date
+      self.logger.debug("Waiting for lock on the event database...")
       self.event_lock.acquire()
+      self.logger.debug("Got the lock on the event database")
       self.events_db._loaddb()
       ## make sure we dont already have this event
       if e.recurring:
         id = e.name
       else:
         id = hashlib.md5("{0}{1}".format(e.name,str(e.date)).encode("utf-8")).hexdigest()
+      self.logger.debug("Generated unique identifier: {0}".format(id))
       if id in self.events_db.getall():
-        self.event_lock.release()
+        self.event_lock.release()       
+        self.logger.debug("Released the lock on the event database")
         e_db = self.events_db.get(id)
         if e_db[3]:
           raise ValueError("Recurring event with this name exists; mark event as not recurring or select a unique name")
@@ -34,11 +39,16 @@ class Server(object):
       self.events_db.set(id,eList)
       self.events_db.dump()
       self.event_lock.release()
-      return True
+      self.logger.debug("Released the lock on the event database")
+      self.logger.info("Added event {0} on {1}".format(e.name,str(e.date)))
+      return self.events_db.get(id)
 
     def deleteEvent(self,name,type = None,date = None, time = None):
+      self.logger.info("Deleting event {0}...".format(name))
       ## make sure weve got the most up to date db
+      self.logger.debug("Waiting for lock on the event database...")
       self.event_lock.acquire()
+      self.logger.debug("Got the lock on the event database")
       self.events_db._loaddb()
       ## get the number of events the name corresponds to
       keys = self.events_db.getall()
@@ -52,15 +62,18 @@ class Server(object):
             es.append(event.Event(datetime.datetime.fromisoformat(e[1]),e[2],e[3],e[4]))
           else:
             self.event_lock.release()
+            self.logger.debug("Released the lock on the event database")
             raise RuntimeError("Unknown event type")
       numEvents = len(es)
       if numEvents < 1:
         self.event_lock.release()
+        self.logger.debug("Released the lock on the event database")
         raise ValueError("Unknown Event")
       ## Make sure inputs make sense
       if type == "one" and (date == None or time == None):
         if numEvents > 1:
           self.event_lock.release()
+          self.logger.debug("Released the lock on the event database")
           raise ValueError("Operation type \'one\' must have a unique name OR inputs for \'date\' and \'time\'")
       ## find the item(s) to delete
       if date != None:
@@ -68,6 +81,7 @@ class Server(object):
         if time != None:
           es = list(filter(lambda e: e.date.strftime("%H:%M") == time,es))
       ### from the database
+      ids = []
       for e in es:
         if e.recurring:
           id = e.name
@@ -75,12 +89,22 @@ class Server(object):
           id_str = "{0}{1}".format(e.name,str(e.date))
           id = hashlib.md5(id_str.encode("utf-8")).hexdigest()
         self.events_db.rem(id)
+        ids.append(id)
       self.events_db.dump()
       self.event_lock.release()
+      self.logger.debug("Released the lock on the event database")
+      self.logger.info("Deleted event {0}...".format(name))
+      ## return TRUE/FALSE if the operation was successful
+      return not True in list(map(lambda x: x in ids,self.events_db.getall()))
 
     def setEvent(self,type,name,prop,val,d = None):
+      self.logger.info("Updating event {0} {1} to {2}...".format(name,prop,val))
+      # setup a variable to track the old value
+      old = None
       ## make sure weve got the most up to date db
+      self.logger.debug("Waiting for lock on the event database...")
       self.event_lock.acquire()
+      self.logger.debug("Got the lock on the event database")
       self.events_db._loaddb()
       ## get total number of events to change
       keys = self.events_db.getall()
@@ -94,28 +118,39 @@ class Server(object):
             es.append(event.Event(datetime.datetime.fromisoformat(e[1]),e[2],e[3],e[4]))
           else:
             self.event_lock.release()
+            self.logger.debug("Released the lock on the event database")
             raise RuntimeError("Unknown event type")
       numEvents = len(es)
       if numEvents < 1:
+        self.logger.debug("No events to change")
         self.event_lock.release()
+        self.logger.debug("Released the lock on the event database")
         raise ValueError("Unknown Event")
+      self.logger.debug("Located {0} events to change".format(numEvents))
       ## type checking
       if type == "one" and (d == None):
         if numEvents > 1:
+          self.logger.debug("Input requests single change to non-unique event")
           self.event_lock.release()
+          self.logger.debug("Released the lock on the event database")
           raise ValueError("Operation type \'one\' must have a unique name OR inputs for \'date\' and \'time\'")
       elif type == "one":
         es = list(filter(lambda e: e.date == d,es))
         numEvents = len(es)
         if numEvents < 1:
+          self.logger.debug("Date filtering removed all applicable events")
           self.event_lock.release()
+          self.logger.debug("Released the lock on the event database")
           raise ValueError("Matching event found with incorrect inputs \'date\' or \'time\'")
       elif type == "all":
         if prop == "recurring":
+          self.logger.debug("Operatiaon \'all\' cannot be used to change \'recurring\'")
           self.event_lock.release()
+          self.logger.debug("Released the lock on the event database")
           raise ValueError("Operation \'all\' cannot be used to change event \'recurring\' status")
         elif prop == "frequency":
           self.event_lock.release()
+          self.logger.debug("Released the lock on the event database")
           raise ValueError("Operation \'all\' cannot be used to change event frequency")
       ## iterate through list of events to change (es)
       for e in es:
@@ -125,25 +160,32 @@ class Server(object):
         else:
           id_str = "{0}{1}".format(e.name,str(e.date))
           id = hashlib.md5(id_str.encode("utf-8")).hexdigest()
+        self.logger.info("Changing event {0} with identifier {1}".format(e.name,id))
         e_db = self.events_db.get(id)
         ## modify event based on the value of prop
         if prop == "date":
+          old = e.date.date()
           e.date = e.date.replace(year=val.year,month=val.month,day=val.day)
         elif prop == "time":
+          old = e.date.time()
           e.date = e.date.replace(hour=val.hour,minute=val.minute)
         elif prop == "name":
+          old = e.name
           e.name = val
         elif prop == "recurring":
+          old = e.recurring
           e.recurring = val
           if not e.recurring:
             e.frequency = None
         elif prop == "frequency":
           if not e.recurring:
             self.event_lock.release()
+            self.logger.debug("Released the lock on the event database")
             raise ValueError("Cannot change frequency for one-time event")
           e.frequency = val
         else:
           self.event_lock.release()
+          self.logger.debug("Released the lock on the event database")
           raise ValueError("Unknown property")
         self.events_db.rem(id)
         ## build the list for storing in the database
@@ -158,21 +200,12 @@ class Server(object):
         self.events_db.set(id,eList)
         self.events_db.dump()
       self.event_lock.release()
-
-    def getEvents(self):
-      self.events_db = pickledb.load(os.path.join(self.db_path,"events.db"),False)
-      keys = self.events_db.getall()
-      for k in keys:
-        dbevent = self.events_db.get(k)
-        if dbevent[0] == "raid":
-          e = event.Raid(datetime.datetime.fromisoformat(dbevent[1]),dbevent[2],dbevent[3],dbevent[4])
-        elif dbevent[0] == "event":
-          e = event.Event(datetime.datetime.fromisoformat(dbevent[1]),dbevent[2],dbevent[3],dbevent[4])
-        else:
-          continue
-      return
+      self.logger.debug("Released the lock on the event database")
+      self.logger.info("Updated event {0} {1} to {2}".format(name,prop,val))
+      return (old,val)
     
     def getRoles(self,roles):
+      self.logger.info("Mapping DB information to Discord Roles...")
       self.db = pickledb.load(os.path.join(self.db_path,"server.db"), False)
       self.Raider = discord.utils.find(lambda r: r.id == self.Raider,roles)
       self.Social = discord.utils.find(lambda r: r.id == self.Social,roles)
@@ -181,15 +214,19 @@ class Server(object):
       return
      
     def getRoster(self):
+      self.logger.info("Getting roster from the DB...")
       self.roster_db = pickledb.load(os.path.join(self.db_path,"roster.db"),False)
       names = self.roster_db.getall()
       for name in names:
         playerSettings = self.roster_db.get(name)
         p = player.Player(name,sched=playerSettings[0],roles=playerSettings[1])
         self.roster.append(p)
+        self.logger.debug("Created known player {0} from database".format(name))
+      self.logger.info("Pulled {0} known players from the database".format(len(self.roster)))
       return
 
     def changePlayer(self,player,prop,val):
+      self.logger.info("Updating Player {0}'s {1} to {2}".format(player.name, prop, val))
       if prop == "sched":
         player.updatePlayer(sched=val)
       elif prop == "roles":
@@ -199,6 +236,7 @@ class Server(object):
       self.updateRoster(player)
 
     def mapRole(self,role,sched):
+      self.logger.info("Mapping role {0} to schedule {1}".format(role.id,sched))
       if role == None:
         return
       elif sched == "Raider":
@@ -219,11 +257,14 @@ class Server(object):
       return
 
     def updateRoster(self,player):
+      self.logger.info("Updating Player \'{0}\'".format(str(player)))
       try:
         i = self.roster_names.index(player.name)
+        self.logger.debug("Found existing player")
         self.roster.pop(i)
         self.roster.insert(i,player)
       except ValueError:
+        self.logger.debug("New player")
         self.roster.append(player)
         self.roster_names.append(player.name)
       self.roster_db.set(player.name,[player.sched,player.roles])
@@ -244,8 +285,6 @@ class Server(object):
         self.roster_names = []
         # setup thread tracking objects
         self.exitFlag = threading.Event()
-        self.roster_lock = threading.Lock()
-        self.server_lock = threading.Lock()
         self.event_lock = threading.Lock()
         # Create the database file for this server
         project_root = os.path.split(os.path.dirname(__file__))[0]

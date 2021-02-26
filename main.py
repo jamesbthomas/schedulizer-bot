@@ -162,12 +162,10 @@ async def on_ready():
     else:
       main_logger.info("KNOWN SERVER Name: {0};ID: {1};Owner: {2}".format(guild.name,guild.id,guild.owner))
       server = client.servers[client.server_ids.index(guild.id)]
-      main_logger.info("Getting roles from database for {0}...".format(server.name))
+      main_logger.info("Mapping roles from database for {0}...".format(server.name))
       server.getRoles(guild.roles)
       main_logger.info("Getting roster from database for {0}...".format(server.name))
       server.getRoster()
-      main_logger.info("Getting events from database for {0}...".format(server.name))
-      server.getEvents()
       main_logger.info("Known server setup complete for {0}".format(server.name))
     try:
       main_logger.info("Roles for {0}: RAIDER/{1},SOCIAL/{2},MEMBER/{3},PUG/{4}".format(server.name,server.Raider.name,server.Social.name,server.Member.name,server.PUG.name))
@@ -210,7 +208,9 @@ async def show(context,opt: str):
     await context.trigger_typing()
     await context.send("\n".join(roster))
   elif opt == "events":
+    main_logger.debug("Server: {0}; Waiting for lock on events_db...".format(context.guild.name))
     server.event_lock.acquire()
+    main_logger.debug("Server: {0}; Got the lock for events_db".format(context.guild.name))
     server.events_db._loaddb()
     events = []
     for key in server.events_db.getall():
@@ -221,6 +221,7 @@ async def show(context,opt: str):
     else:
       await context.send("No events currently scheduled for this server")
     server.event_lock.release()
+    main_logger.debug("Server: {0}; Released the lock on the event database".format(context.guild.name))
   else:
     await context.send_help(context.command)
 
@@ -284,7 +285,6 @@ async def event(context, *args):
       raise ValueError("Operation \'set\' with type \'one\' requires date and time input")
   else:
     raise ValueError("Unknown operation. Only accepts \'create\', \'set\', and \'delete\'")
-
   # Transform inputs into the types we need to construct the object
   ## type
   if operation.lower() == "create":
@@ -333,6 +333,7 @@ async def event(context, *args):
       raise ValueError("Input \'date\' must include a known month, such as JAN for January, FEB for February")
     #### check the year, TODO - not sure how to handle this error, like what if its DEC30 and i'm trying to make an event for 3 days from now?
     if year != datetime.datetime.now().year:
+      main_logger.info("Server: {0}; User {1} requesting event creation for date not in the current year".format(context.guild.name,context.author))
       await context.send("WARNING: Event date is not in the current year")
     ### TIME
     if time != None:
@@ -346,7 +347,7 @@ async def event(context, *args):
         elif len(remainder) == 4:
           min, period = remainder[0:2],remainder[2:4]
         else: #unrecognized time format
-          ## TODO - log this error
+          main_logger.error("Server: {0}; Time Split Failure".format(context.guild.name))
           raise RuntimeError("Time Split Failure")
         min = int(min)
         hour = int(hour)
@@ -397,25 +398,34 @@ async def event(context, *args):
     message = ""
     if result:
       message = "Successfully added event {0}".format(e.name)
-      ## TODO - log successful event creation
+      main_logger.info("Server: {0}; Successfuly created event {1}".format(context.guild.name,e.name))
     else:
-      message = "WARNING: Unable to add event"
-      ## TODO - log this error
+      message = "ERROR: Unable to add event"
+      main_logger.error("Server: {0}; Unable to create event".format(context.guild.name))
   elif operation == "delete":
-    server.deleteEvent(name,type,date,time)
-    message = "Successfully deleted {0} instance(s) of event {1}".format(type,name)
-    # TODO - log event deletion
+    result = server.deleteEvent(name,type,date,time)
+    if result:
+      message = "Successfully deleted {0} instance(s) of event {1}".format(type,name)
+      main_logger.info("Server: {0}; Successfully deleted {0} instance(s) or event {1}".format(context.guild.name,type,name))
+    else:
+      message = "ERROR: Unable to delete event"
+      main_logger.error("Server: {0}; Unable to delete event".format(context.guild.name))
   elif operation == "set":
     if property == "date":
       value = datetime.datetime.strptime(value,"%d%b%Y")
     elif property == "time":
       value = datetime.datetime.strptime(value,"%H:%M")
+    result = None
     if d:
-      server.setEvent(type,name,property,value,d)
+      result = server.setEvent(type,name,property,value,d)
     else:
-      server.setEvent(type,name,property,value)
-    message = "Successfully changed property {0} of event {1} to {2}".format(property,name,value)
-    # TODO - log event change
+      result = server.setEvent(type,name,property,value)
+    if result:
+      message = "Successfully changed property {0} of event {1} to {2}".format(property,name,value)
+      main_logger.info("Server: {0}; Successfully changed property {1} of event {2} from {3} to {4}".format(context.guild.name,property,name,result[0],result[1]))
+    else:
+      message = "ERROR: Unable to modify event"
+      main_logger.error("Server: {0}; Unable to modify event")
   await context.send(message)
 
 @client.command(name="player",help="Manipulate Player objects.\nUsage:\n!player set <name> <property> <val>\n!player show <name>\nNote: To set multiple roles for a player, use the following syntax: !player set <name> roles <first Role>,<second Role>")
@@ -463,9 +473,6 @@ async def player(context, *args):
     server.changePlayer(player,property,value)
     #await context.send("STUB SET\tname: {1};property: {2};value: {3}".format(operation,name,property,value))
     await context.send("Changed property {0} of player {1} to {2}".format(property,name,str(value)))
-  else:
-    # TODO - log internal error
-    raise RuntimeError("Unknown operation")
 
 @client.command(name="update",help="Force the server to rebuild certain components\nUsage:\t!update <component>\nAvailable Components: roster")
 async def update(context,component):
@@ -499,7 +506,7 @@ async def on_command_error(context,error):
 # Call the client run method of the previously created discord client, using the value of the TOKEN key in the current directory's environment file, .env
 load_dotenv()
 TOKEN = os.getenv('TOKEN')
-client.run("ODAzNjc0MTI2NjkwMTU2NTU1.YBBN2w.KhfB1kwGoiXG5mz6TcFQ5Ufe0mc")
+client.run(TOKEN)
 
 # another wrapper so that my logs will be pretty
 def shutdown(client):

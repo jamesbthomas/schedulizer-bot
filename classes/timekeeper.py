@@ -22,7 +22,7 @@ class TimeKeeper (threading.Thread):
     ## what to do while the thread is running
     self.logger.info("Starting TimeKeeper")
     keepTime(self.exitFlag,self.db_path,self.db_lock,self.logger,self.name,self.test_mode)
-    self.logger.info("Stopping TimeKeeper")
+    self.logger.info("Stopping TimeKeeper...")
 
 def keepTime(exitFlag,db_path,db_lock,logger,name, test_mode = False):
   ## Function to keep track of events as time passes
@@ -86,4 +86,5 @@ def keepTime(exitFlag,db_path,db_lock,logger,name, test_mode = False):
     if not test_mode and not exitFlag.isSet():
       logger.debug("Sleeping...")
       time.sleep(30)
+  logger.info("Stopping...")
   return
