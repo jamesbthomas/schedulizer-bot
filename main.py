@@ -147,6 +147,8 @@ async def on_ready():
       main_logger.debug("Mapped MEMBER schedule to role {0}".format(server.Member))
       server.mapRole(discord.utils.find(lambda r: r.name == "Pug",guild.roles),"PUG")
       main_logger.debug("Mapped PUG schedule to role {0}".format(server.PUG))
+      server.mapRole(discord.utils.find(lambda r: r.name == "Schedulizer Admin", guild.roles), "Admin")
+      main_logger.debug("Mapped ADMIN attribute to role {0}".format(server.Admin))
       main_logger.info("Completed processing roles for server {0}".format(server.name))
       # Create user objects for each player with a valid schedule role
       main_logger.info("Processing members for {0}...".format(server.name))
@@ -457,6 +459,10 @@ async def player(context, *args):
   player = next(filter(lambda p: p.name == name,server.roster))
   if player == None:
     raise ValueError("Unknown Player")
+  # check permissions
+  if context.author.name != player.name and server.Admin not in context.author.roles:
+    main_logger.error("Server: {0}; Message: Invalid permissions; User {1} attempted to change property {2} of user {3}".format(server.name,context.author,property,player.name))
+    raise discord.ext.commands.CheckFailure("Insufficient permissions; must have the \'Schedulizer Admin\' Role to modify other users' attributes")
   # make sure the player object has a property associated with the input
   if property != None and not hasattr(player,property):
     raise ValueError("Unknown property")
@@ -491,8 +497,8 @@ async def update(context,component):
 @client.event
 async def on_command_error(context,error):
   if isinstance(error,discord.ext.commands.errors.CheckFailure):
-    main_logger.warning("User {0}/{1} attempted to issue command {2}".format(context.user,context.guild.name,context.message))
-    await context.send('You do not have the correct role for this command.')
+    main_logger.warning("User {0}/{1} attempted to issue command {2}".format(context.author,context.guild.name,context.message.content))
+    await context.send(error)
   elif isinstance(error,discord.ext.commands.errors.MissingRequiredArgument):
     await context.send_help(context.command)
   elif isinstance(error,discord.ext.commands.errors.CommandNotFound):
@@ -505,7 +511,7 @@ async def on_command_error(context,error):
 # Call the client run method of the previously created discord client, using the value of the TOKEN key in the current directory's environment file, .env
 load_dotenv()
 TOKEN = os.getenv('TOKEN')
-client.run(TOKEN)
+client.run("ODAzNjc0MTI2NjkwMTU2NTU1.YBBN2w.cATK07Kk3WahSM_rdlpGMBOFRr0")
 
 # another wrapper so that my logs will be pretty
 def shutdown(client):

@@ -153,11 +153,13 @@ def test_mapRoles():
   testSocial = Role("testSocial",s.name,"@testSocial",2222)
   testMember = Role("testMember",s.name,"@testMember",3333)
   testPUG = Role("testPUG",s.name,"@testPUG",4444)
+  testAdmin = Role("testAdmin",s.name,"@testAdmin",5555)
 
   s.mapRole(testRaider,"Raider")
   s.mapRole(testSocial,"Social")
   s.mapRole(testMember,"Member")
   s.mapRole(testPUG,"PUG")
+  s.mapRole(testAdmin,"Admin")
 
   try:
     # Tests
@@ -165,6 +167,7 @@ def test_mapRoles():
     assert s.Social == testSocial
     assert s.Member == testMember
     assert s.PUG == testPUG
+    assert s.Admin == testAdmin
     # Exception handling
     with pytest.raises(AttributeError,match="Unknown Schedule option"):
       s.mapRole(testRaider,"bad")
@@ -173,6 +176,7 @@ def test_mapRoles():
     assert s.db.get("Social") == testSocial.id
     assert s.db.get("Member") == testMember.id
     assert s.db.get("PUG") == testPUG.id
+    assert s.db.get("Admin") == testAdmin.id
   finally:
     # clear out DBs
     os.remove(os.path.join(project_root,"databases","rolesTest.db","server.db"))

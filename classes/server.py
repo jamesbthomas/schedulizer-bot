@@ -211,6 +211,7 @@ class Server(object):
       self.Social = discord.utils.find(lambda r: r.id == self.Social,roles)
       self.Member = discord.utils.find(lambda r: r.id == self.Member,roles)
       self.PUG = discord.utils.find(lambda r: r.id == self.PUG,roles)
+      self.Admin = discord.utils.find(lambda r: r.id == self.Admin,roles)
       return
      
     def getRoster(self):
@@ -253,6 +254,9 @@ class Server(object):
       elif sched == "PUG":
         self.PUG = role
         self.db.set("PUG",role.id)
+      elif sched == "Admin":
+        self.Admin = role
+        self.db.set("Admin",role.id)
       else:
         raise AttributeError("Unknown Schedule option")
       self.db.dump()
@@ -306,6 +310,7 @@ class Server(object):
         self.Social = self.db.get("Social") or None
         self.Member = self.db.get("Member") or None
         self.PUG = self.db.get("PUG") or None
+        self.Admin = self.db.get("Admin") or None
         self.db.dump()
         # Create the database file for this server's roster
         self.logger.debug("Creating database for the roster")
