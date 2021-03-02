@@ -1,7 +1,7 @@
 # Defines the TimeKeeper class as an extension of the Thread class for time-based actions
 
 import threading, pickledb, os, datetime, hashlib, logging, time
-import event
+import event, player
 
 class TimeKeeper (threading.Thread):
 
@@ -67,7 +67,15 @@ def keepTime(exitFlag,db_path,db_lock,logger,name, test_mode = False):
               eList = ["event",e[1],str(newEvent.date),newEvent.name,newEvent.recurring,newEvent.frequency]
             elif e[0] == "raid":
               newEvent = event.Raid(e[1],d,e[3],e[4],e[5])
-              eList = ["raid",e[1],str(newEvent.date),newEvent.name,newEvent.recurring,newEvent.frequency]
+              # get the list of raiders to start this event
+              roster_db = pickledb.load(os.path.join(db_path,"roster.db"),False,sig=False)
+              roster = []
+              for key in roster_db.getall():
+                p = roster_db.get(key)
+                if p[0] == "Raider":
+                  roster.append(player.Player(key,p[0],p[1]))
+              newEvent.cook(roster)
+              eList = ["raid",e[1],str(newEvent.date),newEvent.name,newEvent.recurring,newEvent.frequency,newEvent.comp,list(map(lambda p: p.name,newEvent.roster)),list(map(lambda p: p.name,newEvent.tanks)),list(map(lambda p: p.name,newEvent.healers)),list(map(lambda p: p.name,newEvent.dps))]
             else:
               logger.critical("Unknown Event type; server:{0};event: {1}".format(name,e))
               raise RuntimeError("Unknown Event type")

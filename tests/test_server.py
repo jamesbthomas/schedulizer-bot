@@ -494,6 +494,14 @@ def test_addEvent():
   once_str = "{0}{1}".format(once.name,str(once.date))
   once_id = hashlib.md5(once_str.encode("utf-8")).hexdigest()
   raid = event.Raid("addEventRaidOwner",d,"recurring raid",True,"monthly")
+  # build a roster for this server so we can make sure raids get auto-created correctly
+  ## roles arent important, schedules are important
+  p1 = player.Player("testPlayer#1111",sched="Social")
+  s.updateRoster(p1)
+  p2 = player.Player("testPlayer#2222",sched="Raider")
+  s.updateRoster(p2)
+  p3 = player.Player("testPlayer#3333",sched="Raider",roles=["Tank"])
+  s.updateRoster(p3)
 
   try:
     # run Tests
@@ -562,6 +570,17 @@ def test_addEvent():
     assert raid.name == raid_db[3]
     assert raid.recurring == raid_db[4]
     assert raid.frequency == raid_db[5]
+    ## adding a raid should setup the roster with all players on the Raider schedule and auto-cook as appopriate
+    ### composition
+    assert raid_db[6] == [2,2,6]
+    ### overall roster
+    assert raid_db[7] == [p2.name,p3.name]
+    ### tanks
+    assert raid_db[8] == [p3.name]
+    ### healers
+    assert raid_db[9] == []
+    ### dps
+    assert raid_db[10] == []
     s.event_lock.release()
     ## Throw error if event with that name FileExistsError
     with pytest.raises(ValueError,match="Event exists"):
@@ -570,19 +589,19 @@ def test_addEvent():
     with pytest.raises(ValueError,match="Recurring event with this name exists; mark event as not recurring or select a unique name"):
       s.addEvent(rec1)
     ## but allow it if its the same name but not recurring
-    one_raid = event.Raid("raidOwner",d,"recurring raid",False)
-    one_raid_str = "{0}{1}".format(one_raid.name,str(one_raid.date))
-    one_raid_id = hashlib.md5(one_raid_str.encode("utf-8")).hexdigest()
-    s.addEvent(one_raid)
+    one_ev = event.Event("raidOwner",d,"recurring raid",False)
+    one_ev_str = "{0}{1}".format(one_ev.name,str(one_ev.date))
+    one_ev_id = hashlib.md5(one_ev_str.encode("utf-8")).hexdigest()
+    s.addEvent(one_ev)
     s.event_lock.acquire()
-    assert one_raid_id in s.events_db.getall()
-    one_raid_db = s.events_db.get(one_raid_id)
-    assert one_raid_db[0] == "raid"
-    assert one_raid_db[1] == one_raid.owner
-    assert datetime.datetime.fromisoformat(one_raid_db[2]) == one_raid.date
-    assert one_raid_db[3] == one_raid.name
-    assert one_raid_db[4] == one_raid.recurring
-    assert one_raid_db[5] == one_raid.frequency
+    assert one_ev_id in s.events_db.getall()
+    one_ev_db = s.events_db.get(one_ev_id)
+    assert one_ev_db[0] == "event"
+    assert one_ev_db[1] == one_ev.owner
+    assert datetime.datetime.fromisoformat(one_ev_db[2]) == one_ev.date
+    assert one_ev_db[3] == one_ev.name
+    assert one_ev_db[4] == one_ev.recurring
+    assert one_ev_db[5] == one_ev.frequency
     s.event_lock.release()
 
   finally:
@@ -674,7 +693,7 @@ def test_deleteEvent():
   rec1_id = hashlib.md5("{0}{1}".format(rec1.name,str(rec1.date)).encode("utf-8")).hexdigest()
   rec2 = event.Event("deleteEventRecTwoOwner",d+datetime.timedelta(0,60),"test event",False)
   rec2_id = hashlib.md5("{0}{1}".format(rec2.name,str(rec2.date)).encode("utf-8")).hexdigest() 
-  one = event.Raid("deleteEventOneOwner",d,"second event",False)
+  one = event.Event("deleteEventOneOwner",d,"second event",False)
   one_id = hashlib.md5("{0}{1}".format(one.name,str(one.date)).encode("utf-8")).hexdigest()
 
   try:
@@ -691,7 +710,7 @@ def test_deleteEvent():
     s.deleteEvent(rec.name)
     s.event_lock.acquire()
     assert len(s.events_db.getall()) == 1
-    assert s.events_db.get(one_id) == ["raid",one.owner,str(one.date),one.name,one.recurring,one.frequency]
+    assert s.events_db.get(one_id) == ["event",one.owner,str(one.date),one.name,one.recurring,one.frequency]
     s.event_lock.release()
     ### a one-time event
     s.addEvent(rec)

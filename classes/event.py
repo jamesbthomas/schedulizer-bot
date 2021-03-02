@@ -29,11 +29,13 @@ class Event(object):
       self.name = name
     else:
       raise TypeError("\'name\' must be of type str")
+    # empty list to track players who have signed up for the event
+    self.roster = []
 
 class Raid(Event):
   # Used to signifiy a raid (for auto-cooking the roster)
 
-  def cook(self,roster: list,depth: list = None):
+  def cook(self,roster: list = None,depth: list = None):
     ## Helper function for picking players based on schedule
     def pickPlayer(role,players,sched):
       index = 0
@@ -47,8 +49,16 @@ class Raid(Event):
     # Type checking
     if not isinstance(roster,list):
       raise TypeError("\'roster\' must be of type *list[Player]")
-    if not isinstance(roster[0],player.Player):
+    if not isinstance(roster[0],player.Player) and self.roster == []:
       raise TypeError("\'roster\' must be of type list[*Player]")
+    if roster == None and self.roster == []:
+      raise ValueError("Raid \'{0}\' cannot cook without a provided roster".format(self.name))
+    elif roster != None and self.roster == []:
+      self.roster = roster
+    elif roster == None and self.roster != []:
+      roster = self.roster
+    ## filter out everything that doesnt have a role
+    roster = list(filter(lambda p: p.roles != None and p.roles != [],roster))
     if depth != None:
       if not isinstance(depth,list):
         raise TypeError("\'depth\' must be of type *list[list[Player]] or None")
@@ -185,4 +195,9 @@ class Raid(Event):
   def __init__(self,owner: str,date: datetime,name: str,recurring: bool,frequency: str = None):
     super().__init__(owner,date,name,recurring,frequency)
     self.comps = [[2,2,6],[2,3,10],[2,4,14],[2,5,18],[2,6,22]]
+    self.roster = []
+    self.comp = []
+    self.tanks = []
+    self.healers = []
+    self.dps = []
     return

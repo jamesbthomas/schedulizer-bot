@@ -36,6 +36,10 @@ class Server(object):
           raise ValueError("Event exists")
       # Turn the event into a list for storage in the DB
       eList = [t,e.owner,str(e.date),e.name,e.recurring,e.frequency]
+      # add the extra bits that only exist for raids
+      if t == "raid":
+        e.cook(roster = list(filter(lambda p: p.sched == "Raider",self.roster)))
+        eList.extend([e.comp,list(map(lambda p: p.name,e.roster)),list(map(lambda p: p.name,e.tanks)),list(map(lambda p: p.name,e.healers)),list(map(lambda p: p.name,e.dps))])
       self.events_db.set(id,eList)
       self.events_db.dump()
       self.event_lock.release()

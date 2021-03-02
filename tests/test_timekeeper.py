@@ -4,7 +4,7 @@ project_root = os.path.split(os.path.dirname(__file__))[0]
 sys.path.append(os.path.join(project_root,"classes"))
 
 # Import module for testing
-import event, server, timekeeper
+import event, server, timekeeper, player
 
 def test_TimeKeeper():
   """
@@ -102,6 +102,16 @@ def test_keepTime():
   s.addEvent(onceHappened)
   s.addEvent(recFuture)
   s.addEvent(onceFuture)
+  # make a raid so we can check the auto-cooking
+  raid = event.Raid("raidOwner",d-datetime.timedelta(2),"raid event",True,"weekly")
+  ## make some players to populate the raid
+  p1 = player.Player("testPlayer#1111",sched="Social")
+  s.updateRoster(p1)
+  p2 = player.Player("testPlayer#2222",sched="Raider")
+  s.updateRoster(p2)
+  p3 = player.Player("testPlayer#3333",sched="Raider",roles=["Tank"])
+  s.updateRoster(p3)
+  s.addEvent(raid)
   ## Make timekeeper
   ### use the threading module to track the exit flag and lock for the db, defaults to UNSET/FALSE
   exitFlag = threading.Event()
@@ -131,7 +141,6 @@ def test_keepTime():
     newHappenedW = event.Event("newPastOwner",d-datetime.timedelta(2)+datetime.timedelta(7),"recurring event weekly",True,"weekly")
     assert newHappenedW.name in s.events_db.getall()
     e_db = s.events_db.get(newHappenedW.name)
-    print(e_db)
     assert e_db
     assert newHappenedW.date == datetime.datetime.fromisoformat(e_db[2])
     assert newHappenedW.name == e_db[3]
@@ -146,6 +155,21 @@ def test_keepTime():
     assert newHappenedM.name == e_db[3]
     assert newHappenedM.recurring == e_db[4]
     assert newHappenedM.frequency == e_db[5]
+
+    # check the new raid got cooked correctly
+    newRaid = event.Raid("raidOwner",d-datetime.timedelta(2)+datetime.timedelta(7),"raid event",True, "weekly")
+    assert newRaid.name in s.events_db.getall()
+    e_db = s.events_db.get(newRaid.name)
+    assert e_db
+    assert newRaid.date == datetime.datetime.fromisoformat(e_db[2])
+    assert newRaid.name == e_db[3]
+    assert newRaid.recurring == e_db[4]
+    assert newRaid.frequency == e_db[5]
+    assert e_db[6] == [2,2,6]
+    assert e_db[7] == [p2.name,p3.name]
+    assert e_db[8] == [p3.name]
+    assert e_db[9] == []
+    assert e_db[10] == []
 
   finally:
     os.remove(os.path.join(project_root,"databases","keepTime.db","server.db"))
