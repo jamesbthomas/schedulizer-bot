@@ -217,7 +217,7 @@ async def show(context,opt: str):
     events = []
     for key in server.events_db.getall():
       e = server.events_db.get(key)
-      events.append("Type: "+e[0]+"\tName: "+e[2]+"\tDate: "+e[1])
+      events.append("Type: {0}\tName: {1}\tDate: {2}\tOwner: {3}".format(e[0],e[3],e[2],e[1]))
     if len(events) > 0:
       await context.send("\n".join(events))
     else:
@@ -391,11 +391,11 @@ async def event(context, *args):
   if operation == "create":
     if type == 'event':
       if not frequency:
-        e = Event(d,name,rec)
+        e = Event(context.author.name,d,name,rec)
       else:
-        e = Event(d,name,rec,frequency)
+        e = Event(context.author.name,d,name,rec,frequency)
     elif type == 'raid':
-      e = Raid(d,name,rec,frequency)
+      e = Raid(context.author.name,d,name,rec,frequency)
     result = server.addEvent(e)
     message = ""
     if result:
@@ -404,7 +404,22 @@ async def event(context, *args):
     else:
       message = "ERROR: Unable to add event"
       main_logger.error("Server: {0}; Unable to create event".format(context.guild.name))
+  ## DELETE
   elif operation == "delete":
+    ## check permissions
+    ### grab all possible events this could apply to
+    server.event_lock.acquire()
+    es = []
+    for key in server.events_db.getall():
+      e = server.events_db.get(key)
+      ## only track events that the author owns
+      if e[1] == context.author.name:
+        es.append(e)
+    server.event_lock.release()
+    ## if we found no events that the author owns AND the author is not an admin
+    if len(es) < 1 and server.Admin not in context.author.roles:
+      main_logger.error("Server: {0}; Message: Invalid permissions; User {1} attempted to change property {2} of user {3}".format(server.name,context.author,property,player.name))
+      raise discord.ext.commands.CheckFailure("Insufficient permissions; must have the \'Schedulizer Admin\' Role to delete events you do not own")
     result = server.deleteEvent(name,type,date,time)
     if result:
       message = "Successfully deleted {0} instance(s) of event {1}".format(type,name)
@@ -412,7 +427,24 @@ async def event(context, *args):
     else:
       message = "ERROR: Unable to delete event"
       main_logger.error("Server: {0}; Unable to delete event".format(context.guild.name))
+  ## SET
   elif operation == "set":
+    ## check permissions
+    ### grab all possible events this could apply to
+    server.event_lock.acquire()
+    es = []
+    for key in server.events_db.getall():
+      e = server.events_db.get(key)
+      ## only track events that the author owns
+      if e[1] == context.author.name:
+        es.append(e)
+    server.event_lock.release()
+    print(len(es))
+    print(context.author.roles)
+    ## if we found no events that the author owns AND the author is not an admin
+    if len(es) < 1 and server.Admin not in context.author.roles:
+      main_logger.error("Server: {0}; Message: Invalid permissions; User {1} attempted to change property {2} of user {3}".format(server.name,context.author,property,player.name))
+      raise discord.ext.commands.CheckFailure("Insufficient permissions; must have the \'Schedulizer Admin\' Role to modify attributes for events you do not own")
     if property == "date":
       value = datetime.datetime.strptime(value,"%d%b%Y")
     elif property == "time":
@@ -511,7 +543,7 @@ async def on_command_error(context,error):
 # Call the client run method of the previously created discord client, using the value of the TOKEN key in the current directory's environment file, .env
 load_dotenv()
 TOKEN = os.getenv('TOKEN')
-client.run("ODAzNjc0MTI2NjkwMTU2NTU1.YBBN2w.cATK07Kk3WahSM_rdlpGMBOFRr0")
+client.run(TOKEN)
 
 # another wrapper so that my logs will be pretty
 def shutdown(client):

@@ -83,17 +83,17 @@ def test_keepTime():
   d = datetime.datetime.now()
   ## create a recurring event that has already happened
   ### 2 days before now, weekly recurrence
-  recHappenedW = event.Event(d-datetime.timedelta(2),"recurring event weekly",True,"weekly")
+  recHappenedW = event.Event("pastEventOwner",d-datetime.timedelta(2),"recurring event weekly",True,"weekly")
   ### 2 days before now, monthly recurrence
-  recHappenedM = event.Event(d-datetime.timedelta(2),"recurring event monthly",True,"monthly")
+  recHappenedM = event.Event("otherEventOwner",d-datetime.timedelta(2),"recurring event monthly",True,"monthly")
   ## create a one-time event that has already happened
-  onceHappened = event.Event(d-datetime.timedelta(2),"occurs once",False)
+  onceHappened = event.Event("eventHappenedOwner",d-datetime.timedelta(2),"occurs once",False)
   onceH_str = "{0}{1}".format(onceHappened.name,str(onceHappened.date))
   onceH_id = hashlib.md5(onceH_str.encode("utf-8")).hexdigest()
   ## create a recurring event that has not happened
-  recFuture = event.Event(d+datetime.timedelta(2),"future recurring event",True,"monthly")
+  recFuture = event.Event("eventFutureOwner",d+datetime.timedelta(2),"future recurring event",True,"monthly")
   ## create a one-time event that has not happened
-  onceFuture = event.Event(d+datetime.timedelta(2),"future one-time event",False)
+  onceFuture = event.Event("futureEventOwner",d+datetime.timedelta(2),"future one-time event",False)
   onceF_str = "{0}{1}".format(onceFuture.name,str(onceFuture.date))
   onceF_id = hashlib.md5(onceF_str.encode("utf-8")).hexdigest()
   ## add events to the server
@@ -128,24 +128,24 @@ def test_keepTime():
     assert onceF_id in s.events_db.getall()
     ## recurring previous event should have new instance
     ### weekly
-    newHappenedW = event.Event(d-datetime.timedelta(2)+datetime.timedelta(7),"recurring event weekly",True,"weekly")
+    newHappenedW = event.Event("newPastOwner",d-datetime.timedelta(2)+datetime.timedelta(7),"recurring event weekly",True,"weekly")
     assert newHappenedW.name in s.events_db.getall()
     e_db = s.events_db.get(newHappenedW.name)
-    assert e_db
     print(e_db)
-    assert newHappenedW.date == datetime.datetime.fromisoformat(e_db[1])
-    assert newHappenedW.name == e_db[2]
-    assert newHappenedW.recurring == e_db[3]
-    assert newHappenedW.frequency == e_db[4]
+    assert e_db
+    assert newHappenedW.date == datetime.datetime.fromisoformat(e_db[2])
+    assert newHappenedW.name == e_db[3]
+    assert newHappenedW.recurring == e_db[4]
+    assert newHappenedW.frequency == e_db[5]
     ### monthly
-    newHappenedM = event.Event(d-datetime.timedelta(2)+datetime.timedelta(28),"recurring event monthly",True,"monthly")
+    newHappenedM = event.Event("newOwnerPast",d-datetime.timedelta(2)+datetime.timedelta(28),"recurring event monthly",True,"monthly")
     assert newHappenedM.name in s.events_db.getall()
     e_db = s.events_db.get(newHappenedM.name)
     assert e_db
-    assert newHappenedM.date == datetime.datetime.fromisoformat(e_db[1])
-    assert newHappenedM.name == e_db[2]
-    assert newHappenedM.recurring == e_db[3]
-    assert newHappenedM.frequency == e_db[4]
+    assert newHappenedM.date == datetime.datetime.fromisoformat(e_db[2])
+    assert newHappenedM.name == e_db[3]
+    assert newHappenedM.recurring == e_db[4]
+    assert newHappenedM.frequency == e_db[5]
 
   finally:
     os.remove(os.path.join(project_root,"databases","keepTime.db","server.db"))

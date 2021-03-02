@@ -488,12 +488,12 @@ def test_addEvent():
   )
   # build the event objects for this test
   d = datetime.datetime.now()
-  rec = event.Event(d,"recurring event",True,"weekly")
-  rec1 = event.Event(d+datetime.timedelta(0,60),"recurring event",True,"weekly")
-  once = event.Event(d,"occurs once",False)
+  rec = event.Event("addEventRecOwner",d,"recurring event",True,"weekly")
+  rec1 = event.Event("addEventRecOneOwner",d+datetime.timedelta(0,60),"recurring event",True,"weekly")
+  once = event.Event("addEventOnceOwner",d,"occurs once",False)
   once_str = "{0}{1}".format(once.name,str(once.date))
   once_id = hashlib.md5(once_str.encode("utf-8")).hexdigest()
-  raid = event.Raid(d,"recurring raid",True,"monthly")
+  raid = event.Raid("addEventRaidOwner",d,"recurring raid",True,"monthly")
 
   try:
     # run Tests
@@ -504,10 +504,11 @@ def test_addEvent():
     rec_db = s.events_db.get(rec.name)
     assert rec_db
     assert rec_db[0] == "event"
-    assert rec.date == datetime.datetime.fromisoformat(rec_db[1])
-    assert rec.name == rec_db[2]
-    assert rec.recurring == rec_db[3]
-    assert rec.frequency == rec_db[4]
+    assert rec.owner == rec_db[1]
+    assert rec.date == datetime.datetime.fromisoformat(rec_db[2])
+    assert rec.name == rec_db[3]
+    assert rec.recurring == rec_db[4]
+    assert rec.frequency == rec_db[5]
     s.event_lock.release()
     ## add second event
     s.addEvent(once)
@@ -516,18 +517,20 @@ def test_addEvent():
     rec_db = s.events_db.get(rec.name)
     assert rec_db
     assert rec_db[0] == "event"
-    assert rec.date == datetime.datetime.fromisoformat(rec_db[1])
-    assert rec.name == rec_db[2]
-    assert rec.recurring == rec_db[3]
-    assert rec.frequency == rec_db[4]
+    assert rec_db[1] == rec.owner
+    assert rec.date == datetime.datetime.fromisoformat(rec_db[2])
+    assert rec.name == rec_db[3]
+    assert rec.recurring == rec_db[4]
+    assert rec.frequency == rec_db[5]
     assert once_id in s.events_db.getall()
     once_db = s.events_db.get(once_id)
     assert once_db
     assert once_db[0] == "event"
-    assert once.date == datetime.datetime.fromisoformat(once_db[1])
-    assert once.name == once_db[2]
-    assert once.recurring == once_db[3]
-    assert once.frequency == once_db[4]
+    assert once_db[1] == once.owner
+    assert once.date == datetime.datetime.fromisoformat(once_db[2])
+    assert once.name == once_db[3]
+    assert once.recurring == once_db[4]
+    assert once.frequency == once_db[5]
     s.event_lock.release()
     ## add third event
     s.addEvent(raid)
@@ -536,35 +539,38 @@ def test_addEvent():
     rec_db = s.events_db.get(rec.name)
     assert rec_db
     assert rec_db[0] == "event"
-    assert rec.date == datetime.datetime.fromisoformat(rec_db[1])
-    assert rec.name == rec_db[2]
-    assert rec.recurring == rec_db[3]
-    assert rec.frequency == rec_db[4]
+    assert rec_db[1] == rec.owner
+    assert rec.date == datetime.datetime.fromisoformat(rec_db[2])
+    assert rec.name == rec_db[3]
+    assert rec.recurring == rec_db[4]
+    assert rec.frequency == rec_db[5]
     assert once_id in s.events_db.getall()
     once_db = s.events_db.get(once_id)
     assert once_db
     assert once_db[0] == "event"
-    assert once.date == datetime.datetime.fromisoformat(once_db[1])
-    assert once.name == once_db[2]
-    assert once.recurring == once_db[3]
-    assert once.frequency == once_db[4]
+    assert once_db[1] == once.owner
+    assert once.date == datetime.datetime.fromisoformat(once_db[2])
+    assert once.name == once_db[3]
+    assert once.recurring == once_db[4]
+    assert once.frequency == once_db[5]
     assert raid.name in s.events_db.getall()
     raid_db = s.events_db.get(raid.name)
     assert raid_db
     assert raid_db[0] == "raid"
-    assert raid.date == datetime.datetime.fromisoformat(raid_db[1])
-    assert raid.name == raid_db[2]
-    assert raid.recurring == raid_db[3]
-    assert raid.frequency == raid_db[4]
+    assert raid_db[1] == raid.owner
+    assert raid.date == datetime.datetime.fromisoformat(raid_db[2])
+    assert raid.name == raid_db[3]
+    assert raid.recurring == raid_db[4]
+    assert raid.frequency == raid_db[5]
     s.event_lock.release()
-    ## Throw error of event with that name FileExistsError
+    ## Throw error if event with that name FileExistsError
     with pytest.raises(ValueError,match="Event exists"):
       s.addEvent(once)
     ## throw error if we try to add a recurring event with the same name
     with pytest.raises(ValueError,match="Recurring event with this name exists; mark event as not recurring or select a unique name"):
       s.addEvent(rec1)
     ## but allow it if its the same name but not recurring
-    one_raid = event.Raid(d,"recurring raid",False)
+    one_raid = event.Raid("raidOwner",d,"recurring raid",False)
     one_raid_str = "{0}{1}".format(one_raid.name,str(one_raid.date))
     one_raid_id = hashlib.md5(one_raid_str.encode("utf-8")).hexdigest()
     s.addEvent(one_raid)
@@ -572,10 +578,11 @@ def test_addEvent():
     assert one_raid_id in s.events_db.getall()
     one_raid_db = s.events_db.get(one_raid_id)
     assert one_raid_db[0] == "raid"
-    assert datetime.datetime.fromisoformat(one_raid_db[1]) == one_raid.date
-    assert one_raid_db[2] == one_raid.name
-    assert one_raid_db[3] == one_raid.recurring
-    assert one_raid_db[4] == one_raid.frequency
+    assert one_raid_db[1] == one_raid.owner
+    assert datetime.datetime.fromisoformat(one_raid_db[2]) == one_raid.date
+    assert one_raid_db[3] == one_raid.name
+    assert one_raid_db[4] == one_raid.recurring
+    assert one_raid_db[5] == one_raid.frequency
     s.event_lock.release()
 
   finally:
@@ -614,7 +621,7 @@ def test_getEvents():
   )
   # create an event
   d = datetime.datetime.now()
-  e = event.Event(d,"test event",True,"weekly")
+  e = event.Event("getEventsOwner",d,"test event",True,"weekly")
   # add event to the server
   s.addEvent(e)
   # recreate the client
@@ -628,10 +635,12 @@ def test_getEvents():
     assert len(newS.events_db.getall()) == 1
     e_db = newS.events_db.get("test event")
     assert e_db
-    assert e_db[1] == str(e.date)
-    assert e_db[2] == e.name
-    assert e_db[3] == e.recurring
-    assert e_db[4] == e.frequency
+    assert e_db[0] == "event"
+    assert e_db[1] == e.owner
+    assert e_db[2] == str(e.date)
+    assert e_db[3] == e.name
+    assert e_db[4] == e.recurring
+    assert e_db[5] == e.frequency
   finally:
     os.remove(os.path.join(project_root,"databases","getEvents.db","server.db"))
     os.remove(os.path.join(project_root,"databases","getEvents.db","roster.db"))
@@ -660,12 +669,12 @@ def test_deleteEvent():
   )
   # create an event
   d = datetime.datetime.now()
-  rec = event.Event(d,"test event",True,"weekly")
-  rec1 = event.Event(d+datetime.timedelta(0,60),"test event",True,"weekly")
+  rec = event.Event("deleteEventRecOwner",d,"test event",True,"weekly")
+  rec1 = event.Event("deleteEventRecOneOwner",d+datetime.timedelta(0,60),"test event",True,"weekly")
   rec1_id = hashlib.md5("{0}{1}".format(rec1.name,str(rec1.date)).encode("utf-8")).hexdigest()
-  rec2 = event.Event(d+datetime.timedelta(0,60),"test event",False)
+  rec2 = event.Event("deleteEventRecTwoOwner",d+datetime.timedelta(0,60),"test event",False)
   rec2_id = hashlib.md5("{0}{1}".format(rec2.name,str(rec2.date)).encode("utf-8")).hexdigest() 
-  one = event.Raid(d,"second event",False)
+  one = event.Raid("deleteEventOneOwner",d,"second event",False)
   one_id = hashlib.md5("{0}{1}".format(one.name,str(one.date)).encode("utf-8")).hexdigest()
 
   try:
@@ -682,14 +691,14 @@ def test_deleteEvent():
     s.deleteEvent(rec.name)
     s.event_lock.acquire()
     assert len(s.events_db.getall()) == 1
-    assert s.events_db.get(one_id) == ["raid",str(one.date),one.name,one.recurring,one.frequency]
+    assert s.events_db.get(one_id) == ["raid",one.owner,str(one.date),one.name,one.recurring,one.frequency]
     s.event_lock.release()
     ### a one-time event
     s.addEvent(rec)
     s.deleteEvent(one.name)
     s.event_lock.acquire()
     assert len(s.events_db.getall()) == 1
-    assert s.events_db.get(rec.name) == ["event",str(rec.date),rec.name,rec.recurring,rec.frequency]
+    assert s.events_db.get(rec.name) == ["event",rec.owner,str(rec.date),rec.name,rec.recurring,rec.frequency]
     s.event_lock.release()
     ## delete unknown event
     s.deleteEvent(rec.name)
@@ -754,16 +763,23 @@ def test_setEvent():
   d2 = d + datetime.timedelta(2,120)
   d2_date = d2 + datetime.timedelta(1)
   d2_time = d2_date + datetime.timedelta(0,60)
-  e1 = event.Event(d,"test event",True,"weekly")
+  e1 = event.Event("setEventOneOwner",d,"test event",True,"weekly")
   e1_id = hashlib.md5("{0}{1}".format(e1.name,str(e1.date)).encode("utf-8")).hexdigest()
-  e2 = event.Event(d,"test event2",False)
+  e2 = event.Event("setEventTwoOwner",d,"test event2",False)
   e2_id = hashlib.md5("{0}{1}".format(e2.name,str(e2.date)).encode("utf-8")).hexdigest()
-  e3 = event.Event(d2,"test event2",False)
+  e3 = event.Event("setEventThreeOwner",d2,"test event2",False)
   e3_id = hashlib.md5("{0}{1}".format(e3.name,str(e3.date)).encode("utf-8")).hexdigest()
 
   # add event to the server
   s.addEvent(e1)
   s.addEvent(e2)
+
+  # create a player object for some of the owners
+  p = player.Player(name="setEventOneOwner")
+  p2 = player.Player(name="setEventTwoOwner")
+  # add to the roster so we can compare against it later
+  s.updateRoster(p)
+  s.updateRoster(p2)
 
   try:
     # change one event
@@ -773,10 +789,10 @@ def test_setEvent():
     s.events_db._loaddb()
     e_db = s.events_db.get(e1.name)
     assert e_db
-    assert e_db[2] == e1.name
-    assert e_db[1] == str(d_date)
-    assert e_db[3] == e1.recurring
-    assert e_db[4] == e1.frequency
+    assert e_db[3] == e1.name
+    assert e_db[2] == str(d_date)
+    assert e_db[4] == e1.recurring
+    assert e_db[5] == e1.frequency
     s.event_lock.release()
     ## Change the time of the event
     s.setEvent("one",e1.name,"time",d_time.time(),d_date)
@@ -784,10 +800,10 @@ def test_setEvent():
     s.events_db._loaddb()
     e_db = s.events_db.get(e1.name)
     assert e_db
-    assert e_db[2] == e1.name
-    assert e_db[1] == str(d_time)
-    assert e_db[3] == e1.recurring
-    assert e_db[4] == e1.frequency
+    assert e_db[3] == e1.name
+    assert e_db[2] == str(d_time)
+    assert e_db[4] == e1.recurring
+    assert e_db[5] == e1.frequency
     s.event_lock.release()
     ## change the name of the event
     s.setEvent("one",e1.name,"name","changed test event",d_time)
@@ -795,10 +811,10 @@ def test_setEvent():
     s.events_db._loaddb()
     e_db = s.events_db.get("changed test event")
     assert e_db
-    assert e_db[2] == "changed test event"
-    assert e_db[1] == str(d_time)
-    assert e_db[3] == e1.recurring
-    assert e_db[4] == e1.frequency
+    assert e_db[3] == "changed test event"
+    assert e_db[2] == str(d_time)
+    assert e_db[4] == e1.recurring
+    assert e_db[5] == e1.frequency
     s.event_lock.release()
     ## change the frequency of the event
     s.setEvent("one","changed test event","frequency","monthly",d_time)
@@ -806,10 +822,10 @@ def test_setEvent():
     s.events_db._loaddb()
     e_db = s.events_db.get("changed test event")
     assert e_db
-    assert e_db[2] == "changed test event"
-    assert e_db[1] == str(d_time)
-    assert e_db[3] == e1.recurring
-    assert e_db[4] == "monthly"
+    assert e_db[3] == "changed test event"
+    assert e_db[2] == str(d_time)
+    assert e_db[4] == e1.recurring
+    assert e_db[5] == "monthly"
     s.event_lock.release()
     ## change the recurring status of the event
     s.setEvent("one","changed test event","recurring",False,d_time)
@@ -818,17 +834,30 @@ def test_setEvent():
     s.events_db._loaddb()
     e_db = s.events_db.get(e1_id)
     assert e_db
-    assert e_db[2] == "changed test event"
-    assert e_db[1] == str(d_time)
-    assert e_db[3] == False
-    assert e_db[4] == None
+    assert e_db[3] == "changed test event"
+    assert e_db[2] == str(d_time)
+    assert e_db[4] == False
+    assert e_db[5] == None
+    s.event_lock.release()
+    ## change the owner of the event
+    s.setEvent("one","changed test event","owner","setEventTwoOwner")
+    s.event_lock.acquire()
+    s.events_db._loaddb()
+    e_db = s.events_db.get(e1_id)
+    assert e_db
+    assert e_db[0] == "event"
+    assert e_db[1] == "setEventTwoOwner"
+    assert e_db[2] == str(d_time)
+    assert e_db[3] == "changed test event"
+    assert e_db[4] == False
+    assert e_db[5] == None
     ## other events didnt change
     e2_db = s.events_db.get(e2_id)
     assert e2_db
-    assert e2_db[2] == e2.name
-    assert e2_db[1] == str(e2.date)
-    assert e2_db[3] == e2.recurring
-    assert e2_db[4] == e2.frequency
+    assert e2_db[3] == e2.name
+    assert e2_db[2] == str(e2.date)
+    assert e2_db[4] == e2.recurring
+    assert e2_db[5] == e2.frequency
     s.event_lock.release()
     ## throw errors
     ### tried to change frequency but event is not recurring
@@ -847,16 +876,16 @@ def test_setEvent():
     s.events_db._loaddb()
     e2_db = s.events_db.get(e2_id)
     assert e2_db
-    assert e2_db[2] == e2.name
-    assert e2_db[1] == str(d+datetime.timedelta(3))
-    assert e2_db[3] == e2.recurring
-    assert e2_db[4] == e2.frequency
+    assert e2_db[3] == e2.name
+    assert e2_db[2] == str(d+datetime.timedelta(3))
+    assert e2_db[4] == e2.recurring
+    assert e2_db[5] == e2.frequency
     e3_db = s.events_db.get(e3_id)
     assert e3_db
-    assert e3_db[2] == e3.name
-    assert e3_db[1] == str(d2+datetime.timedelta(1))
-    assert e3_db[3] == e3.recurring
-    assert e3_db[4] == e3.frequency
+    assert e3_db[3] == e3.name
+    assert e3_db[2] == str(d2+datetime.timedelta(1))
+    assert e3_db[4] == e3.recurring
+    assert e3_db[5] == e3.frequency
     s.event_lock.release()
     ## reset for next battery
     s.setEvent("one",e2.name,"date",d,d+datetime.timedelta(3))
@@ -868,16 +897,16 @@ def test_setEvent():
     s.events_db._loaddb()
     e2_db = s.events_db.get(e2_id)
     assert e2_db
-    assert e2_db[2] == e2.name
-    assert e2_db[1] == str(d+datetime.timedelta(0,180))
-    assert e2_db[3] == e2.recurring
-    assert e2_db[4] == e2.frequency
+    assert e2_db[3] == e2.name
+    assert e2_db[2] == str(d+datetime.timedelta(0,180))
+    assert e2_db[4] == e2.recurring
+    assert e2_db[5] == e2.frequency
     e3_db = s.events_db.get(e3_id)
     assert e3_db
-    assert e3_db[2] == e3.name
-    assert e3_db[1] == str(d2+datetime.timedelta(1,60))
-    assert e3_db[3] == e3.recurring
-    assert e3_db[4] == e3.frequency
+    assert e3_db[3] == e3.name
+    assert e3_db[2] == str(d2+datetime.timedelta(1,60))
+    assert e3_db[4] == e3.recurring
+    assert e3_db[5] == e3.frequency
     s.event_lock.release()
     ## change the name of the events
     s.setEvent("all",e2.name,"name","changed "+e2.name)
@@ -887,23 +916,23 @@ def test_setEvent():
     s.events_db._loaddb()
     e2_db = s.events_db.get(e2_id)
     assert e2_db
-    assert e2_db[2] == "changed test event2"
-    assert e2_db[1] == str(d+datetime.timedelta(0,180))
-    assert e2_db[3] == e2.recurring
-    assert e2_db[4] == e2.frequency
+    assert e2_db[3] == "changed test event2"
+    assert e2_db[2] == str(d+datetime.timedelta(0,180))
+    assert e2_db[4] == e2.recurring
+    assert e2_db[5] == e2.frequency
     e3_db = s.events_db.get(e3_id)
     assert e3_db
-    assert e3_db[2] == "changed test event2"
-    assert e3_db[1] == str(d+datetime.timedelta(3,180))
-    assert e3_db[3] == e3.recurring
-    assert e3_db[4] == e3.frequency
+    assert e3_db[3] == "changed test event2"
+    assert e3_db[2] == str(d+datetime.timedelta(3,180))
+    assert e3_db[4] == e3.recurring
+    assert e3_db[5] == e3.frequency
     ## other event didnt change
     e_db = s.events_db.get(e1_id)
     assert e_db
-    assert e_db[2] == "changed test event"
-    assert e_db[1] == str(d_time)
-    assert e_db[3] == False
-    assert e_db[4] == None
+    assert e_db[3] == "changed test event"
+    assert e_db[2] == str(d_time)
+    assert e_db[4] == False
+    assert e_db[5] == None
     s.event_lock.release()
     ## throw errors
     ### cannot change recurring of all events

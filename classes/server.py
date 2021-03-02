@@ -30,12 +30,12 @@ class Server(object):
         self.event_lock.release()       
         self.logger.debug("Released the lock on the event database")
         e_db = self.events_db.get(id)
-        if e_db[3]:
+        if e_db[4]:
           raise ValueError("Recurring event with this name exists; mark event as not recurring or select a unique name")
         else:
           raise ValueError("Event exists")
       # Turn the event into a list for storage in the DB
-      eList = [t,str(e.date),e.name,e.recurring,e.frequency]
+      eList = [t,e.owner,str(e.date),e.name,e.recurring,e.frequency]
       self.events_db.set(id,eList)
       self.events_db.dump()
       self.event_lock.release()
@@ -55,11 +55,11 @@ class Server(object):
       es = []
       for key in keys:
         e = self.events_db.get(key)
-        if e[2] == name:
+        if e[3] == name:
           if e[0] == "raid":
-            es.append(event.Raid(datetime.datetime.fromisoformat(e[1]),e[2],e[3],e[4]))
+            es.append(event.Raid(e[1],datetime.datetime.fromisoformat(e[2]),e[3],e[4],e[5]))
           elif e[0] == "event":
-            es.append(event.Event(datetime.datetime.fromisoformat(e[1]),e[2],e[3],e[4]))
+            es.append(event.Event(e[1],datetime.datetime.fromisoformat(e[2]),e[3],e[4],e[5]))
           else:
             self.event_lock.release()
             self.logger.debug("Released the lock on the event database")
@@ -111,11 +111,11 @@ class Server(object):
       es = []
       for key in keys:
         e = self.events_db.get(key)
-        if e[2] == name:
+        if e[3] == name:
           if e[0] == "raid":
-            es.append(event.Raid(datetime.datetime.fromisoformat(e[1]),e[2],e[3],e[4]))
+            es.append(event.Raid(e[1],datetime.datetime.fromisoformat(e[2]),e[3],e[4],e[5]))
           elif e[0] == "event":
-            es.append(event.Event(datetime.datetime.fromisoformat(e[1]),e[2],e[3],e[4]))
+            es.append(event.Event(e[1],datetime.datetime.fromisoformat(e[2]),e[3],e[4],e[5]))
           else:
             self.event_lock.release()
             self.logger.debug("Released the lock on the event database")
@@ -183,13 +183,23 @@ class Server(object):
             self.logger.debug("Released the lock on the event database")
             raise ValueError("Cannot change frequency for one-time event")
           e.frequency = val
+        elif prop == "owner":
+          # make sure the val is a valid player identifier
+          p = self.roster_db.get(val)
+          if p:
+            old = e.owner
+            e.owner = val
+          else:
+            self.event_lock.release()
+            self.logger.debug("Released the lock on the event database")
+            raise ValueError("Cannot change owner to a non-existent user")
         else:
           self.event_lock.release()
           self.logger.debug("Released the lock on the event database")
           raise ValueError("Unknown property")
         self.events_db.rem(id)
         ## build the list for storing in the database
-        eList = [e_db[0],str(e.date),e.name,e.recurring,e.frequency]
+        eList = [e_db[0],e.owner,str(e.date),e.name,e.recurring,e.frequency]
         ## rebuild the id for the event
         if e.recurring:
           id = e.name

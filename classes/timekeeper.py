@@ -38,7 +38,7 @@ def keepTime(exitFlag,db_path,db_lock,logger,name, test_mode = False):
       now = datetime.datetime.now()
       for key in list(db.getall()):
         e = db.get(key)
-        eDate = datetime.datetime.fromisoformat(e[1])
+        eDate = datetime.datetime.fromisoformat(e[2])
         # if this event occurs in the future, pass
         if eDate > now:
           logger.debug("Event {0} on server {1} is in the future".format(key,name))
@@ -51,23 +51,23 @@ def keepTime(exitFlag,db_path,db_lock,logger,name, test_mode = False):
           logger.debug("Expired Event {0} removed from DB".format(key))
           # if this event is recurring
           d = eDate
-          if e[3]:
+          if e[4]:
             logger.debug("Expired Event {0} is recurring".format(key))
             # if it occurs every week
-            if e[4] == "weekly":
+            if e[5] == "weekly":
               d = d + datetime.timedelta(7)
-            elif e[4] == "monthly":
+            elif e[5] == "monthly":
               d = d + datetime.timedelta(28)
             else:
               logger.critical("Unknown Frequency; server:{0};event:{1}".format(name,e))
               raise RuntimeError("Unknown frequency")
 
             if e[0] == "event":
-              newEvent = event.Event(d,e[2],e[3],e[4])
-              eList = ["event",str(newEvent.date),newEvent.name,newEvent.recurring,newEvent.frequency]
+              newEvent = event.Event(e[1],d,e[3],e[4],e[5])
+              eList = ["event",e[1],str(newEvent.date),newEvent.name,newEvent.recurring,newEvent.frequency]
             elif e[0] == "raid":
-              newEvent = event.Raid(d,e[2],e[3],e[4])
-              eList = ["raid",str(newEvent.date),newEvent.name,newEvent.recurring,newEvent.frequency]
+              newEvent = event.Raid(e[1],d,e[3],e[4],e[5])
+              eList = ["raid",e[1],str(newEvent.date),newEvent.name,newEvent.recurring,newEvent.frequency]
             else:
               logger.critical("Unknown Event type; server:{0};event: {1}".format(name,e))
               raise RuntimeError("Unknown Event type")

@@ -7,7 +7,8 @@ import player
 
 class Event(object):
 
-  def __init__(self,date: datetime.datetime,name: str,recurring: bool,frequency: str = None):
+  def __init__(self,owner: str,date: datetime.datetime,name: str,recurring: bool,frequency: str = None):
+    self.owner = owner
     if isinstance(date,datetime.datetime):
       self.date = date
     else:
@@ -181,7 +182,7 @@ class Raid(Event):
     #print("DPS - ",list(map(lambda p: p.name,self.dps)))
     #print("BREAKBREAKBREAK")
 
-  def __init__(self,date: datetime,name: str,recurring: bool,frequency: str = None):
-    super().__init__(date,name,recurring,frequency)
+  def __init__(self,owner: str,date: datetime,name: str,recurring: bool,frequency: str = None):
+    super().__init__(owner,date,name,recurring,frequency)
     self.comps = [[2,2,6],[2,3,10],[2,4,14],[2,5,18],[2,6,22]]
     return

@@ -19,13 +19,15 @@ def test_makeEvent():
   # Test expected use
   ## Datetime constructor: year, month, day, hour, minute, second
   d = datetime.datetime(1970,1,1,0,0,0)
-  recurring = event.Event(d,"recurring event",True,"weekly")
-  once = event.Event(d,"event that occurs once",False)
+  recurring = event.Event("testOwner",d,"recurring event",True,"weekly")
+  once = event.Event("secondOwner",d,"event that occurs once",False)
 
+  assert recurring.owner == "testOwner"
   assert recurring.date == d
   assert recurring.recurring == True
   assert recurring.name == "recurring event"
   assert recurring.frequency == "weekly"
+  assert once.owner == "secondOwner"
   assert once.date == d
   assert once.recurring == False
   assert once.name == "event that occurs once"
@@ -33,16 +35,16 @@ def test_makeEvent():
   # Test bad datatypes
   ## bad date
   with pytest.raises(TypeError):
-    badDate = event.Event("1970-01-01 00:00:00","has a bad date",True)
+    badDate = event.Event("badDateOwner","1970-01-01 00:00:00","has a bad date",True)
   ## bad recurring
   with pytest.raises(TypeError):
-    badRecurring = event.Event(d,"has bad recurring","true")
+    badRecurring = event.Event("bad recurring owner",d,"has bad recurring","true")
   ## bad name
   with pytest.raises(TypeError):
-    badName = event.Event(d,123,True)
+    badName = event.Event("badnameowner",d,123,True)
   ## bad freq
   with pytest.raises(TypeError):
-    badFreq = event.Event(d,"123",True,123)
+    badFreq = event.Event("badfreqowner",d,"123",True,123)
 
 def test_makeRaid():
   """
@@ -52,8 +54,8 @@ def test_makeRaid():
   """
 
   d = datetime.datetime(1970,1,1,0,0,0)
-  recurring = event.Raid(d,"recurring raid",True,"weekly")
-  once = event.Raid(d,"raid occurs once",False)
+  recurring = event.Raid("raidOwner",d,"recurring raid",True,"weekly")
+  once = event.Raid("onceRaidOwner",d,"raid occurs once",False)
   comps = [[2,2,6],[2,3,10],[2,4,14],[2,5,18],[2,6,22]]
 
   assert recurring.date == d
@@ -115,7 +117,7 @@ def test_cookRaid():
   DPSP = player.Player("DPSP","PUG",["DPS"])
 
   # Create the Raid event
-  raid = event.Raid(datetime.datetime(1970,1,1,0,0,0),"Raid.cook() Test",False)
+  raid = event.Raid("cookRaidOwner",datetime.datetime(1970,1,1,0,0,0),"Raid.cook() Test",False)
 
   # Tests for input types
   with pytest.raises(TypeError,match=re.escape("\'roster\' must be of type *list[Player]")):
