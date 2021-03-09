@@ -6,6 +6,62 @@ from discord.ext import commands
 class Server(object):
     # Class for tracking properties by server
 
+    def addPlayer(self,p,e):
+      # type checking
+      if not isinstance(p,player.Player):
+        self.logger.error("Input \'player\' must be a properly constructed Player object")
+        raise TypeError("Input \'player\' must be a properly constructed Player object")
+      if not isinstance(e,event.Event) and not isinstance(e,event.Raid):
+        self.logger.error("Input \'event\' must be a properly constructed Event or Raid object")
+        raise TypeError("Input \'event\' must be a properly constructed Event or Raid object")
+      ## grab the lock
+      self.event_lock.acquire()
+      ## check to see if the player is already signed up
+      if p in e.roster:
+        self.event_lock.release()
+        self.logger.info("Player {0} already signed up for event {1}".format(p.name,e.name))
+        raise ValueError("Player {0} already signed up for event {1}".format(p.name,e.name))
+      # add the player to the roster of the event
+      e.roster.append(p)
+      # if raid, cook and return
+      if isinstance(e,event.Raid):
+        e.cook()
+        if p in e.tanks:
+          ret = "Tank"
+        elif p in e.healers:
+          ret = "Healer"
+        elif p in e.dps:
+          ret = "DPS"
+        else:
+          if p in e.roster and p.roles != []:
+            self.event_lock.release()
+            self.logger.critical("Player not added to roster because could not assign a valid role")
+            raise RuntimeError("Player {0} NOT added to roster, could not assign a valid role".format(p.name))
+          elif p not in e.roster:
+            self.event_lock.release()
+            self.logger.critical("Player not added to roster")
+            raise RuntimeError("Player {0} not added to roster".format(p.name))
+          elif p.roles == []:
+            self.logger.info("Player added to roster but has no roles")
+            ret = "None"
+      else:
+        ret = p in e.roster
+
+      ## add to db and dump
+      if e.recurring:
+        id = e.name
+      else:
+        id = hashlib.md5("{0}{1}".format(e.name,str(e.date)).encode("utf-8")).hexdigest()
+      self.events_db.set(id,e.dump())
+      self.events_db.dump()
+      ## release lock
+      self.event_lock.release()
+
+      return ret
+
+    def removePlayer(self,p,e):
+      return
+
     def addEvent(self,e):
       self.logger.info("Adding event {0} on {1}...".format(e.name,str(e.date)))
       ## do some light error checking
@@ -14,7 +70,8 @@ class Server(object):
       elif isinstance(e,event.Event):
         t = "event"
       else:
-        raise TypeError("Input must be a propertly constructed Event or Raid object")
+        self.logger.error("Input must be a properly constructed Event or Raid object")
+        raise TypeError("Input must be a properly constructed Event or Raid object")
       ## make sure the db is up to date
       self.logger.debug("Waiting for lock on the event database...")
       self.event_lock.acquire()
@@ -35,12 +92,12 @@ class Server(object):
         else:
           raise ValueError("Event exists")
       # Turn the event into a list for storage in the DB
-      eList = [t,e.owner,str(e.date),e.name,e.recurring,e.frequency]
+      ##eList = [t,e.owner,str(e.date),e.name,e.recurring,e.frequency]
       # add the extra bits that only exist for raids
       if t == "raid":
         e.cook(roster = list(filter(lambda p: p.sched == "Raider",self.roster)))
-        eList.extend([e.comp,list(map(lambda p: p.name,e.roster)),list(map(lambda p: p.name,e.tanks)),list(map(lambda p: p.name,e.healers)),list(map(lambda p: p.name,e.dps))])
-      self.events_db.set(id,eList)
+#        eList.extend([e.comp,list(map(lambda p: p.name,e.roster)),list(map(lambda p: p.name,e.tanks)),list(map(lambda p: p.name,e.healers)),list(map(lambda p: p.name,e.dps))])
+      self.events_db.set(id,e.dump())
       self.events_db.dump()
       self.event_lock.release()
       self.logger.debug("Released the lock on the event database")
@@ -203,7 +260,7 @@ class Server(object):
           raise ValueError("Unknown property")
         self.events_db.rem(id)
         ## build the list for storing in the database
-        eList = [e_db[0],e.owner,str(e.date),e.name,e.recurring,e.frequency]
+        ###eList = [e_db[0],e.owner,str(e.date),e.name,e.recurring,e.frequency]
         ## rebuild the id for the event
         if e.recurring:
           id = e.name
@@ -211,7 +268,7 @@ class Server(object):
           id_str = "{0}{1}".format(e.name,str(e.date))
           id = hashlib.md5(id_str.encode("utf-8")).hexdigest()
         # add the event to the database
-        self.events_db.set(id,eList)
+        self.events_db.set(id,e.dump())
         self.events_db.dump()
       self.event_lock.release()
       self.logger.debug("Released the lock on the event database")
@@ -232,10 +289,12 @@ class Server(object):
       self.logger.info("Getting roster from the DB...")
       self.roster_db = pickledb.load(os.path.join(self.db_path,"roster.db"),False)
       names = self.roster_db.getall()
+      index = 0
       for name in names:
         playerSettings = self.roster_db.get(name)
         p = player.Player(name,sched=playerSettings[0],roles=playerSettings[1])
         self.roster.append(p)
+        self.roster_names.append(p.name)
         self.logger.debug("Created known player {0} from database".format(name))
       self.logger.info("Pulled {0} known players from the database".format(len(self.roster)))
       return
@@ -283,6 +342,8 @@ class Server(object):
         self.logger.debug("Found existing player")
         self.roster.pop(i)
         self.roster.insert(i,player)
+        self.roster_names.pop(i)
+        self.roster_names.insert(i,player.name)
       except ValueError:
         self.logger.debug("New player")
         self.roster.append(player)
@@ -306,6 +367,7 @@ class Server(object):
         # setup thread tracking objects
         self.exitFlag = threading.Event()
         self.event_lock = threading.Lock()
+        self.roster_lock = threading.Lock()
         # Create the database file for this server
         project_root = os.path.split(os.path.dirname(__file__))[0]
         try:

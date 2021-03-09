@@ -710,14 +710,14 @@ def test_deleteEvent():
     s.deleteEvent(rec.name)
     s.event_lock.acquire()
     assert len(s.events_db.getall()) == 1
-    assert s.events_db.get(one_id) == ["event",one.owner,str(one.date),one.name,one.recurring,one.frequency]
+    assert s.events_db.get(one_id) == one.dump()
     s.event_lock.release()
     ### a one-time event
     s.addEvent(rec)
     s.deleteEvent(one.name)
     s.event_lock.acquire()
     assert len(s.events_db.getall()) == 1
-    assert s.events_db.get(rec.name) == ["event",rec.owner,str(rec.date),rec.name,rec.recurring,rec.frequency]
+    assert s.events_db.get(rec.name) == rec.dump()
     s.event_lock.release()
     ## delete unknown event
     s.deleteEvent(rec.name)
@@ -1075,3 +1075,96 @@ def test_changePlayer():
     os.rmdir(os.path.join(project_root,"databases","changePlayer.db"))
     client.servers.pop(client.server_ids.index("changePlayer"))
     client.server_ids.pop(client.server_ids.index("changePlayer"))
+
+def test_addPlayer():
+  """
+  GIVEN SchedClient object with a correctly structured Player and Event object
+  WHEN the method is called
+  THEN add the player to the roster for the event
+  """
+  
+  # Create the client
+  client = None
+  client = server.SchedClient(command_prefix='!')
+  client.setup()
+  s = client.addServer(
+    id = "addPlayer",
+    name = "Server for addPlayer test",
+    owner = "TestOwner"
+  )
+  # create player objects
+  p1 = player.Player("testPlayer#1111",sched="Raider",roles=["Tank"])
+  p2 = player.Player("testPlayer#2222",sched="Social",roles=["Healer"])
+  s.updateRoster(p1)
+  # create an event
+  d = datetime.datetime.now()
+  e = event.Event("event owner",d,"test event",False)
+  e_id = hashlib.md5("{0}{1}".format(e.name,str(e.date)).encode("utf-8")).hexdigest()
+  r = event.Raid("raid owner",d,"test raid",True,"weekly")
+  s.addEvent(e)
+  s.addEvent(r)
+
+  try:
+    ## sign up for an event
+    e_out = s.addPlayer(p1,e)
+    ## sign up for a raid
+    r_out = s.addPlayer(p2,r)
+    ## reload the db
+    s.event_lock.acquire()
+    s.events_db._loaddb()
+    ## grab the modified events
+    e_db = s.events_db.get(e_id)
+    assert e_db
+    r_db = s.events_db.get(r.name)
+    assert r_db
+    s.event_lock.release()
+
+    ## check return values
+    ### events just return true or false
+    assert e_out
+    ### raids return the role that player was selected for
+    assert r_out == "Healer"
+
+    ## check attributes
+    ### event
+    assert e_db[0] == "event"
+    assert e_db[1] == e.owner
+    assert e_db[2] == str(e.date)
+    assert e_db[3] == e.name
+    assert e_db[4] == e.recurring
+    assert e_db[5] == e.frequency
+    assert e_db[6] == [p1.name]
+    ### raid
+    assert r_db[0] == "raid"
+    assert r_db[1] == r.owner
+    assert r_db[2] == str(r.date)
+    assert r_db[3] == r.name
+    assert r_db[4] == r.recurring
+    assert r_db[5] == r.frequency
+    assert r_db[6] == [2,2,6]
+    assert r_db[7] == [p1.name,p2.name]
+    assert r_db[8] == [p1.name]
+    assert r_db[9] == [p2.name]
+    assert r_db[10] == []
+
+    ## check errors
+    ### player is already signed up
+    with pytest.raises(ValueError,match="Player {0} already signed up for event {1}".format(p1.name,e.name)):
+      s.addPlayer(p1,e)
+    ### TODO - future version, if more than max number of players signed up for raid, do a waiting list
+
+  finally:
+    # release the lock
+    try:
+      s.event_lock.release()
+    except RuntimeError as e:
+      if str(e) != "release unlocked lock":
+        raise
+      else:
+        None
+    os.remove(os.path.join(project_root,"databases","addPlayer.db","server.db"))
+    os.remove(os.path.join(project_root,"databases","addPlayer.db","roster.db"))
+    os.remove(os.path.join(project_root,"databases","addPlayer.db","events.db"))
+    os.rmdir(os.path.join(project_root,"databases","addPlayer.db"))
+    client.servers.pop(client.server_ids.index("addPlayer"))
+    client.server_ids.pop(client.server_ids.index("addPlayer"))

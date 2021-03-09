@@ -8,6 +8,8 @@ import sys
 import re
 # Required for working with datetime objects
 import datetime
+# Required for the hashing functions used to generate unique IDs
+import hashlib
 # Required for reading the auth token from the environment file (not included in git repo)
 from dotenv import load_dotenv
 # Required to handle logging on the script side
@@ -154,7 +156,7 @@ async def on_ready():
       main_logger.info("Processing members for {0}...".format(server.name))
       for member in guild.members:
         try:
-          p = Player(member.name,sched=discord.utils.find(lambda r: r == server.Raider or r == server.Social or r == server.Member or r == server.PUG,member.roles).name)
+          p = Player(member.display_name,sched=discord.utils.find(lambda r: r == server.Raider or r == server.Social or r == server.Member or r == server.PUG,member.roles).name)
           server.updateRoster(p)
           main_logger.debug("Created Player Object: Name:{0};Schedule:{1};Roles:{2}".format(p.name,p.sched,p.roles))
         except AttributeError:
@@ -439,8 +441,6 @@ async def event(context, *args):
       if e[1] == context.author.name:
         es.append(e)
     server.event_lock.release()
-    print(len(es))
-    print(context.author.roles)
     ## if we found no events that the author owns AND the author is not an admin
     if len(es) < 1 and server.Admin not in context.author.roles:
       main_logger.error("Server: {0}; Message: Invalid permissions; User {1} attempted to change property {2} of user {3}".format(server.name,context.author,property,player.name))
@@ -482,22 +482,25 @@ async def player(context, *args):
     ## Pass, show just needs a name
     None
   else:
-    raise ValueError("Unknown operation")
+    raise ValueError("Unknown operation \'{0}\'".format(operation))
   # check we got a name
   if name == None:
     raise ValueError("Input \'name\' required")
   # locate the player object
   server = client.servers[client.server_ids.index(context.guild.id)]
-  player = next(filter(lambda p: p.name == name,server.roster))
+  try:
+    player = next(filter(lambda p: p.name == name,server.roster))
+  except StopIteration: # next will throw this error if filter() returns no entries
+    raise ValueError("Unknown Player \'{0}\'".format(name))
   if player == None:
-    raise ValueError("Unknown Player")
+    raise ValueError("Unknown Player \'{0}\'".format(name))
   # check permissions
   if context.author.name != player.name and server.Admin not in context.author.roles:
     main_logger.error("Server: {0}; Message: Invalid permissions; User {1} attempted to change property {2} of user {3}".format(server.name,context.author,property,player.name))
     raise discord.ext.commands.CheckFailure("Insufficient permissions; must have the \'Schedulizer Admin\' Role to modify other users' attributes")
   # make sure the player object has a property associated with the input
   if property != None and not hasattr(player,property):
-    raise ValueError("Unknown property")
+    raise ValueError("Unknown property \'{0}\'".format(property))
   ## SHOW
   if operation == "show":
     await context.send(str(player))
@@ -506,10 +509,10 @@ async def player(context, *args):
       value = value.split(",")
       ## check that the user input valid roles
       for r in value:
-        if r not in ["Tank","Healer","DPS"]:
-          raise ValueError("Unknown role")
+        if r.lower() not in ["tank","healer","dps"]:
+          main_logger.info("Unknown role")
+          raise ValueError("Unknown role \'{0}\'".format(r))
     server.changePlayer(player,property,value)
-    #await context.send("STUB SET\tname: {1};property: {2};value: {3}".format(operation,name,property,value))
     await context.send("Changed property {0} of player {1} to {2}".format(property,name,str(value)))
 
 @client.command(name="update",help="Force the server to rebuild certain components\nUsage:\t!update <component>\nAvailable Components: roster")
@@ -522,22 +525,212 @@ async def update(context,component):
         server.updateRoster(p)
       except AttributeError:
         continue
+    await context.send("Update complete, issue \'!show roster\' to check")
   else:
-    raise ValueError("Unknown component")
-  await context.send("Update complete, issue \'!show roster\' to check")
+    raise ValueError("Unknown component \'{0}\'".format(component))
+
+@client.command(name="accept",help="Accept the invite for an event\nUsage:\t!accept <name> <date> <time> [<player name>]")
+async def accept(context,*args):
+  # process inputs
+  name, date, time, p_name = [None]*4
+  try:
+    name = args[0]
+    date = args[1]
+    time = args[2]
+    p_name = args[3]
+  except IndexError:
+    None
+  except Exception as e:
+    # unknown exception
+    main_logger.CRITICAL("Unexpected exception: {0}".format(str(e)))
+    raise RuntimeError("Unexpected exception: {0}".format(str(e)))
+  #grab the server for this command
+  server = client.servers[client.server_ids.index(context.guild.id)]
+  # value checking
+  ## datetime first
+  if date == None:
+    main_logger.info("Server: {0}; Message: Input \'date\' is required".format(server.name))
+    raise ValueError("Input \'date\' is required")
+  if time == None:
+    main_logger.info("Server: {0}; Message: Input \'time\' is required".format(server.name))
+    raise ValueError("Input \'time\' is required")
+  ### format checking for date
+  mons = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"]
+  if not re.match("\d\d\w\w\w(\d\d\d\d)?",date):
+    raise ValueError("Input \'date\' must be in the DDMMM or DDMMMYYY format, such as 01JAN or 01JAN1970")
+  elif re.match("\d\d\w\w\w\d\d\d\d",date): # with year
+    day = int(date[0:2])
+    mon = date[2:5].upper()
+    year = int(date[5:9])
+  else: # without year
+    day = int(date[0:1])
+    mon = date[2:5].upper()
+    year = datetime.datetime.now().year
+  if mon == "JAN" or mon == "MAR" or mon == "MAY" or mon == "JUL" or mon == "AUG" or mon == "OCT" or mon == "DEC":
+    # 31-day month
+    if day > 31 or day < 1:
+      raise ValueError("Input \'date\' has too many days; JAN/MAR/MAY/JUL/AUG/OCT/DEC can only have days between 0-31")
+  elif mon == "APR" or mon == "JUN" or mon == "SEP" or mon == "NOV":
+    # 30-day month
+    if day > 30 or day < 1:
+      raise ValueError("Input \'date\' has too many days; APR/JUN/SEP/NOV can only have days between 0-30")
+  elif mon == "FEB" and year%4 != 0:
+    # 28-day month
+    if day > 28 or day < 1:
+      raise ValueError("Input \'date\' has too many days; FEB in years not divisible by 4 can only have days between 0-28")
+  elif mon == "FEB" and year%4 == 0:
+    # 29-day month
+    if day > 29 or day < 1:
+      raise ValueError("Input \'date\' has too many days; FEB in leap years can only have days between 0-29")
+  else: # unknown month
+    raise ValueError("Input \'date\' must include a known month, such as JAN for January, FEB for February")
+  ### format checking for time
+  if not re.match("\d{1,2}:\d\d(AM|PM)?",time):
+    raise ValueError("Input \'time\' must be in the HH:MM format using 12- or 24-hour clocks, such as 10:00PM or 22:00")
+  else: # Check to make sure the format is good, ie 22:00 PM is wrong
+    hour, remainder = time.split(":")
+    if len(remainder) == 2:
+      min = remainder[0:2]
+      period = None
+    elif len(remainder) == 4:
+      min, period = remainder[0:2],remainder[2:4]
+    else: #unrecognized time format
+      main_logger.error("Server: {0}; Time Split Failure".format(context.guild.name))
+      raise RuntimeError("Time Split Failure")
+    min = int(min)
+    hour = int(hour)
+    if min > 60:
+      raise ValueError("Input \'time\' cannot have minutes greater than 60")
+    if period != None:
+      # in 12-hour mode
+      if period != "AM" and period != "PM":
+        raise ValueError("Input \'time\' in 12-hour mode must include either AM or PM")
+      if hour > 12 or hour < 0:
+        raise ValueError("Input \'time\' in 12-hour mode can only have hours between 0-12")
+      if period == "PM":
+        hour += 12
+    else: # in 24-hour mode
+      if hour > 24 or hour < 0:
+        raise ValueError("Input \'time\' in 24-hour mode can only have hours bettween 0-24")
+  ### make the object
+  d = datetime.datetime(year,mons.index(mon)+1,day,hour,min)
+
+  ## get the event (and show that the name is correct)
+  if name == None:
+    raise ValueError("Input \'name\' required")
+  id = hashlib.md5("{0}{1}".format(name,str(d)).encode("utf-8")).hexdigest()
+  ### make sure the db is up to date and get the lock
+  server.event_lock.acquire()
+  server.events_db._loaddb()
+  e_db = server.events_db.get(name)
+  if not e_db:
+    e_db = server.events_db.get(id)
+  server.event_lock.release()
+  if not e_db:
+    raise ValueError("Inputs \'name\', \'date\', and \'time\' must correspond to a scheduled event")
+  if e_db[0] == "event":
+    # turn e_db[6] into a list of players, instead of a list of player names
+    server.roster_lock.acquire()
+    server.roster_db._loaddb()
+    roster = []
+    for n in e_db[6]:
+      pr = server.roster_db.get(n)
+      if pr:
+        roster.append(Player(n,pr[0],pr[1]))
+      else:
+        main_logger.warning("Server: {0}; Unknown player with name \'{1}\'".format(server.name,n))
+    server.roster_lock.release() 
+    e = Event(e_db[1],datetime.datetime.fromisoformat(e_db[2]),e_db[3],e_db[4],e_db[5],roster)
+  elif e_db[0] == "raid":
+    # turn e_db[7] into a list of players, instead of a list of player names
+    roster = []
+    for n in e_db[7]:
+      try:
+        p = server.roster[server.roster_names.index(n)]
+        roster.append(p)
+      except:
+        main_logger.warning("Server: {0}; Unknown player with name \'{1}\'".format(server.name,n))
+    if len(roster) < 1:
+      roster = None
+    e = Raid(e_db[1],datetime.datetime.fromisoformat(e_db[2]),e_db[3],e_db[4],e_db[5],roster)
+  else:
+    main_logger.critical("Server: {0}; Unknown event type from database {1}".format(server.name,e[0]))
+    raise RuntimeError("Unknown event type from database")
+  ## get the player object
+  if p_name != None:
+    if p_name not in server.roster_names:
+      raise ValueError("Unknown Player \'{0}\'".format(p_name))
+    # p_name provided, so we're signing up someone else
+    p = server.roster[server.roster_names.index(p_name)]
+    if not p:
+      raise ValueError("Input \'name\' must be the name of a player on this server")
+    if context.author.name != p.name and server.Admin not in context.author.roles:
+      main_logger.error("Server: {0}; Message: Invalid permissions; User {1} attempted to accept invitation for event {2} on {3} for user {4}".format(server.name,context.author,e.name,str(e.date),p_name))
+      raise discord.ext.commands.CheckFailure("Insufficient permissions; must have the \'Schedulizer Admin\' Role to modify other users' attributes")
+  else:
+    # p_name not provided, so we're signing up the author
+    p = server.roster[server.roster_names.index(context.author.name)]
+  # got all of the attributes, now to run the command
+  try:
+    ret = server.addPlayer(p,e)
+  except ValueError as err:
+    if str(err) == "Player {0} already signed up for event {1}".format(p.name,e.name):
+      ret = None
+    else:
+      raise err
+  if ret == False: #return value was false
+    await context.send("Internal error: Player {0} not added to roster for event {1}".format(p.name,e.name))
+    main_logger.critical("Server: {0}; Message: Failed to add player to roster".format(server.name))
+  elif ret == True: #return value was explicitly true
+    await context.send("Player {0} successfully added to roster for event {1}".format(p.name,e.name))
+    main_logger.info("Server: {0}; Successfully added player {1} to roster for event {2} on {3}".format(server.name,p.name,e.name,str(d)))
+  elif ret == "None":
+    await context.send("Player {0} successfully added to roster for event {1}, but has no valid roles\nUse the !player command to set this player's roles".format(p.name,e.name))
+    main_logger.info("Server: {0}; Successfully added player {1} to roster for event {2}, could not assign role".format(server.name,p.name,e.name))
+  elif ret == None:
+    await context.send("Player {0} already signed up for event {1}".format(p.name,e.name))
+    main_logger.info("Server: {0}: Player {1} already signed up for event {2}".format(server.name,p.name,e.name))
+  else: #return value was the role the player was selected
+    await context.send("Player {0} successfully added to roster for raid {1}, assigned role \'{2}\'\nNOTE: Role assignments may change as additional players sign up".format(p.name,e.name,ret))
+    main_logger.info("Server: {0}; Successfully added player {1} to roster for raid {2} on {3}, assigned role {4}".format(server.name,p.name,e.name,str(d),ret))
+
+@client.command(name="decline",help="Decline the invite to an event\nUsage:\t!decline <name> <date> [<time> <player name>]")
+async def decline(context,*args):
+  # process inputs
+  name, date, time, p_name = [None]*4
+  try:
+    name = args[0]
+    date = args[1]
+    time = args[2]
+    p_name = args[3]
+  except IndexError:
+    None
+  except Exception as e:
+    # unknown exception
+    main_logger.CRITICAL("Unexpected exception: {0}".format(str(e)))
+    raise RuntimeError("Unexpected exception: {0}".format(str(e)))
+  ## value checking
+  await context.send("stub for !decline, args: {0}, {1}, {2}, {3}".format(name,date,time,p_name))
 
 @client.event
 async def on_command_error(context,error):
+  print(error)
   if isinstance(error,discord.ext.commands.errors.CheckFailure):
-    main_logger.warning("User {0}/{1} attempted to issue command {2}".format(context.author,context.guild.name,context.message.content))
+    main_logger.error("User {0}/{1} attempted to issue command {2}".format(context.author,context.guild.name,context.message.content))
     await context.send(error)
   elif isinstance(error,discord.ext.commands.errors.MissingRequiredArgument):
+    main_logger.info("Server: {0}; Missing required arguments; Command: {1}".format(context.guild.name,context.message.content))
     await context.send_help(context.command)
   elif isinstance(error,discord.ext.commands.errors.CommandNotFound):
+    main_logger.info("Server: {0}; Unrecognized command {0}".format(context.guild.name,context.message.content))
     await context.send("Unrecognized command")
     await context.send_help()
+  elif str(error).split(":")[1] == RuntimeError:
+    main_logger.info("Server: {0}; Command: {1}; {2}".format(context.guild.name,context.command.name,":".join(str(error).split(":")[1:])))
+    await context.send("Internal Error")
   else:
-    await context.send(":".join(str(error).split(":")[1:]))
+    main_logger.info("Server: {0}; Command: {1}; Error Message: {2}".format(context.guild.name,context.command.name,":".join(str(error).split(":")[1:])))
+    await context.send(":".join(str(error).split(":")[2:]))
     await context.send_help(context.command)
 
 # Call the client run method of the previously created discord client, using the value of the TOKEN key in the current directory's environment file, .env

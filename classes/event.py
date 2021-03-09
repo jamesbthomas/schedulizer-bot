@@ -1,13 +1,15 @@
 # Defines the Event class and associated subclasses
 import datetime, os, sys
 project_root = os.path.split(os.path.dirname(__file__))[0]
-print(project_root)
 sys.path.append(os.path.join(project_root,"classes"))
 import player
 
 class Event(object):
 
-  def __init__(self,owner: str,date: datetime.datetime,name: str,recurring: bool,frequency: str = None):
+  def dump(self):
+    return ["event",self.owner,str(self.date),self.name,self.recurring,self.frequency,list(map(lambda p: p.name,self.roster))]
+
+  def __init__(self,owner: str,date: datetime.datetime,name: str,recurring: bool,frequency: str = None,roster = None):
     self.owner = owner
     if isinstance(date,datetime.datetime):
       self.date = date
@@ -30,7 +32,14 @@ class Event(object):
     else:
       raise TypeError("\'name\' must be of type str")
     # empty list to track players who have signed up for the event
-    self.roster = []
+    if roster == None:
+      self.roster = []
+    elif isinstance(roster,list):
+      if not isinstance(roster[0],player.Player):
+        raise TypeError("Input \'roster\' must be \'None\' or of type list[*Player]")
+      self.roster = roster
+    else:
+      raise TypeError("Input \'roster\' must be \'None\' or of type *list[Player]")
 
 class Raid(Event):
   # Used to signifiy a raid (for auto-cooking the roster)
@@ -47,10 +56,18 @@ class Raid(Event):
         index += 1
       return None
     # Type checking
-    if not isinstance(roster,list):
+    if not isinstance(roster,list) and self.roster == []:
       raise TypeError("\'roster\' must be of type *list[Player]")
-    if not isinstance(roster[0],player.Player) and self.roster == []:
-      raise TypeError("\'roster\' must be of type list[*Player]")
+    
+    try:
+      if not isinstance(roster[0],player.Player) and self.roster == []:
+        raise TypeError("\'roster\' must be of type list[*Player]")
+    except Exception as e:
+      if str(e) != "\'NoneType\' object is not subscriptable":
+        raise
+      else:
+        None
+    
     if roster == None and self.roster == []:
       raise ValueError("Raid \'{0}\' cannot cook without a provided roster".format(self.name))
     elif roster != None and self.roster == []:
@@ -85,15 +102,12 @@ class Raid(Event):
     elif len(nonPugs) <= 30:
       self.comp = self.comps[4]
     else: # More than 30 people signed up for the raid
-      print("HERE",len(roster),len(nonPugs))
       # Filter out PUG players, then Member players, then Social players until we are under 30 people
       rev = scheds[::-1]
       ## Already filtered out the PUGs, so we start by removing the Members
-      print(scheds,rev)
       index = 1
       roster = nonPugs
       while len(roster) > 30 and index < len(rev)-1:
-        print("filtering",rev[index])
         roster = list(filter(lambda p: p.sched != rev[index],roster))
         index += 1
       # Still too many people? throw an error
@@ -129,7 +143,6 @@ class Raid(Event):
     ## Remove those selected as tanks from the list of available players
     for t in self.tanks:
       roster.pop(roster.index(t))
-
     # SELECT HEALERS
     ## Pick healers
     healers = list(filter(lambda p: "Healer" in p.roles,roster))
@@ -187,15 +200,19 @@ class Raid(Event):
     for d in self.dps:
       roster.pop(roster.index(d))
     
+    ## TODO - catch the runtime error where there are players left
     #print("TANKS - ",list(map(lambda p: p.name,self.tanks)))
     #print("HEALERS - ",list(map(lambda p: p.name,self.healers)))
     #print("DPS - ",list(map(lambda p: p.name,self.dps)))
     #print("BREAKBREAKBREAK")
 
-  def __init__(self,owner: str,date: datetime,name: str,recurring: bool,frequency: str = None):
-    super().__init__(owner,date,name,recurring,frequency)
+  def dump(self):
+    # helper function to build the storable item for this event
+    return ["raid",self.owner,str(self.date),self.name,self.recurring,self.frequency,self.comp,list(map(lambda p: p.name, self.roster)),list(map(lambda p: p.name, self.tanks)),list(map(lambda p: p.name, self.healers)),list(map(lambda p: p.name, self.dps))]
+
+  def __init__(self,owner: str,date: datetime,name: str,recurring: bool,frequency: str = None, roster = None):
+    super().__init__(owner,date,name,recurring,frequency,roster)
     self.comps = [[2,2,6],[2,3,10],[2,4,14],[2,5,18],[2,6,22]]
-    self.roster = []
     self.comp = []
     self.tanks = []
     self.healers = []
