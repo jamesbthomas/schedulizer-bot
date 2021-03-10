@@ -1168,3 +1168,90 @@ def test_addPlayer():
     os.rmdir(os.path.join(project_root,"databases","addPlayer.db"))
     client.servers.pop(client.server_ids.index("addPlayer"))
     client.server_ids.pop(client.server_ids.index("addPlayer"))
+
+def test_removePlayer():
+  """
+  GIVEN SchedClient object with a correctly structured Player and Event object
+  WHEN the method is called
+  THEN remove the player from the roster for the event
+  """
+  
+  # Create the client
+  client = None
+  client = server.SchedClient(command_prefix='!')
+  client.setup()
+  s = client.addServer(
+    id = "removePlayer",
+    name = "Server for removePlayer test",
+    owner = "TestOwner"
+  )
+  # create player objects
+  p1 = player.Player("testPlayer#1111",sched="Raider",roles=["Tank"])
+  p2 = player.Player("testPlayer#2222",sched="Social",roles=["Healer"])
+  s.updateRoster(p1)
+  # create an event
+  d = datetime.datetime.now()
+  e = event.Event("event owner",d,"test event",False)
+  e_id = hashlib.md5("{0}{1}".format(e.name,str(e.date)).encode("utf-8")).hexdigest()
+  r = event.Raid("raid owner",d,"test raid",True,"weekly")
+  s.addEvent(e)
+  s.addEvent(r)
+
+  try:
+    # remove the raider from the raid
+    s.removePlayer(p1,r)
+    # edge, to make sure everything works together
+    ## sign up the social
+    s.addPlayer(p2,e)
+    ## remove the social
+    s.removePlayer(p2,e)
+    s.event_lock.acquire()
+    s.events_db._loaddb()
+    r_db = s.events_db.get(r.name)
+    assert r_db
+    e_db = s.events_db.get(e_id)
+    assert e_db
+    s.event_lock.release()
+    
+    # check attributes
+    ## event
+    assert e_db[0] == "event"
+    assert e_db[1] == e.owner
+    assert e_db[2] == str(e.date)
+    assert e_db[3] == e.name
+    assert e_db[4] == e.recurring
+    assert e_db[5] == e.frequency
+    assert e_db[6] == []
+    ## raid
+    assert r_db[0] == "raid"
+    assert r_db[1] == r.owner
+    assert r_db[2] == str(r.date)
+    assert r_db[3] == r.name
+    assert r_db[4] == r.recurring
+    assert r_db[5] == r.frequency
+    assert r_db[6] == []
+    assert r_db[7] == []
+    assert r_db[8] == []
+    assert r_db[9] == []
+    assert r_db[10] == []
+
+    # check errors
+    ## player not signed up
+    with pytest.raises(ValueError,match="Player {0} not signed up for event {1}".format(p1.name,r.name)):
+      s.removePlayer(p1,r)
+  
+  finally:
+  # release the lock
+    try:
+      s.event_lock.release()
+    except RuntimeError as e:
+      if str(e) != "release unlocked lock":
+        raise
+      else:
+        None
+    os.remove(os.path.join(project_root,"databases","removePlayer.db","server.db"))
+    os.remove(os.path.join(project_root,"databases","removePlayer.db","roster.db"))
+    os.remove(os.path.join(project_root,"databases","removePlayer.db","events.db"))
+    os.rmdir(os.path.join(project_root,"databases","removePlayer.db"))
+    client.servers.pop(client.server_ids.index("removePlayer"))
+    client.server_ids.pop(client.server_ids.index("removePlayer"))

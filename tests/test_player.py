@@ -22,7 +22,7 @@ def test_makePlayer():
 
     assert named.name == "testPlayer#1111"
     assert named.sched == "Raider"
-    assert named.roles == None
+    assert named.roles == []
     assert roled.name == "testPlayer#2222"
     assert roled.sched == "Social"
     assert roled.roles == ["Tank","DPS"]
@@ -44,7 +44,7 @@ def test_updatePlayer():
   assert p.sched == "Social"
 
   # Update roles from None
-  assert p.roles == None
+  assert p.roles == []
   p.updatePlayer(roles=["Tank"])
   assert p.roles == ["Tank"]
   # Update roles from set value

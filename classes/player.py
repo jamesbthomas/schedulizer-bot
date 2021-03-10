@@ -12,7 +12,7 @@ class Player(object):
 
   def __str__(self):
     if self.roles != []:
-      return "Name: "+self.name+"; Sched: "+self.sched+"; Roles: "+" > ".join(self.roles)
+      return "Name: "+self.name+"; Sched: "+str(self.sched)+"; Roles: "+" > ".join(self.roles)
     else:
       return "Name: {0}; Sched: {1}; Roles: None".format(self.name,self.sched)
 

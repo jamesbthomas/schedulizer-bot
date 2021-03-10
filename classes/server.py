@@ -60,7 +60,42 @@ class Server(object):
       return ret
 
     def removePlayer(self,p,e):
-      return
+      # type checking
+      if not isinstance(p,player.Player):
+        self.logger.error("Input \'player\' must be a properly constructed Player object")
+        raise TypeError("Input \'player\' must be a properly constructed Player object")
+      if not isinstance(e,event.Event) and not isinstance(e,event.Raid):
+        self.logger.error("Input \'event\' must be a properly constructed Event or Raid object")
+        raise TypeError("Input \'event\' must be a properly constructed Event or Raid object")
+      # remove the player from the roster
+      self.event_lock.acquire()
+      try:
+        e.roster.remove(p)
+      except ValueError as err:
+        if str(err) == "list.remove(x): x not in list":
+          self.logger.info("Player {0} not signed up for event {1}".format(p.name,e.name))
+          ## catch this exception on the other end
+          raise ValueError("Player {0} not signed up for event {1}".format(p.name,e.name))
+        else:
+          self.logger.critical("Unknown error: {0}".format(str(err)))
+          raise err
+      ## cook if its a raid
+      if isinstance(e,event.Raid):
+        self.logger.info("Re-Cooking event {0}".format(e.name))
+        e.cook()
+      # get the ID for this event
+      if e.recurring:
+        id = e.name
+      else:
+        id = hashlib.md5("{0}{1}".format(e.name,str(e.date)).encode("utf-8")).hexdigest()
+      self.events_db.set(id,e.dump())
+      # dump the db
+      self.events_db.dump()
+      self.event_lock.release()
+      # do some checking for internal errors
+      if p.name in e.roster:
+        self.logger.critical("Failed to removed player {0} from event {1}".format(p.name,e.name))
+        raise RuntimeError("Failed to removed player {0} from event {1}".format(p.name,e.name))
 
     def addEvent(self,e):
       self.logger.info("Adding event {0} on {1}...".format(e.name,str(e.date)))

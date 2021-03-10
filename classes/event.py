@@ -56,7 +56,7 @@ class Raid(Event):
         index += 1
       return None
     # Type checking
-    if not isinstance(roster,list) and self.roster == []:
+    if not isinstance(roster,list) and roster != None:
       raise TypeError("\'roster\' must be of type *list[Player]")
     
     try:
@@ -69,7 +69,16 @@ class Raid(Event):
         None
     
     if roster == None and self.roster == []:
-      raise ValueError("Raid \'{0}\' cannot cook without a provided roster".format(self.name))
+      if self.tanks != [] or self.healers != [] or self.dps != []:
+        # no provided roster, and the event doesnt have a roster right now, BUT tanks and healers have been assigned
+        ## means that the last player had been removed, so just reset all of the lists and return
+        self.tanks = []
+        self.healers = []
+        self.dps = []
+        self.comp = []
+        return
+      else:
+        raise ValueError("Raid \'{0}\' cannot cook without a provided roster".format(self.name))
     elif roster != None and self.roster == []:
       self.roster = roster
     elif roster == None and self.roster != []:
@@ -83,13 +92,10 @@ class Raid(Event):
         raise TypeError("\'depth\' must be of type list[*list[Player]] or None")
       if not isinstance(depth[0][0],player.Player):
         raise TypeError("\'depth\' must be of type list[list[*Player]] or None")
-    self.tanks = []
-    self.healers = []
-    self.dps = []
-    self.comp = []
     scheds = ["Raider","Social","Member","PUG"]
     # Determine composition
     ## based on total number of raiders and socials signed up (ignores pugs)
+    self.comp = []
     nonPugs = list(filter(lambda p: p.sched != "PUG",roster))
     if len(nonPugs) <= 10:
       self.comp = self.comps[0]
@@ -115,6 +121,9 @@ class Raid(Event):
         raise ValueError("Too many Raiders")
       else:
         self.comp = self.comps[4]
+    self.tanks = []
+    self.healers = []
+    self.dps = []
     # SELECT TANKS
     tanks_unsort = list(filter(lambda p: "Tank" in p.roles,roster))
     t = sorted(tanks_unsort,key=lambda p: p.roles.index("Tank"))
