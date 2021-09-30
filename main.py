@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Required to interface with the discord API
 import discord
 # Required to read the token from the environment file
