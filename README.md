@@ -57,7 +57,7 @@ Python 3.8+, dotenv, pytest, pickledb, and discord python libraries.
 * Commands to create, modify, and delete Events and Raids
 * Automatic role assignments for Raids
 * By-user sign ups for Events, and for Raids based on schedule
-* Pre-Staged development environment leveraging Python3.8 virtual environments (Issue #7)
+* Pre-Staged development environment leveraging Python3.8 virtual environments (Issue #16)
 ## v1.0 - Vanilla - No release date
 * Privacy-oriented services that allow administrators and users to control the information the Schedulizer maintains
 * Ad-Hoc and On-Demand configuration options, allowing server owners and administrators to configure/reconfigure key aspects of the app at will
