@@ -1,7 +1,7 @@
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 project_dir := $(dir $(mkfile_path))
 
-test: install
+test:
 	python3 -m pytest $(project_dir)tests
 
 install:
@@ -49,10 +49,3 @@ service: install test
 	echo "" >> /etc/systemd/system/multi-user.target.wants/schedulizer.service
 	echo "[Install]" >> /etc/systemd/system/multi-user.target.wants/schedulizer.service
 	echo "WantedBy=multi-user.target" >> /etc/systemd/system/multi-user.target.wants/schedulizer.service
-
-
-
-
-
-
-
